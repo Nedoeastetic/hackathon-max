@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Home, MessageCircle, Wrench, Layout, FlaskConical } from 'lucide-react';
+import { Home, MessageCircle, Wrench, Layout, FlaskConical, Plug } from 'lucide-react';
 import { useAppStore } from './store/useStore';
 import { ResidentChat } from './components/ResidentChat';
 import { MasterDashboard } from './components/MasterDashboard';
 import { ArchitectureView } from './components/ArchitectureView';
 import { OverviewPage } from './components/OverviewPage';
 import { TestScenarios } from './components/TestScenarios';
+import { IntegrationGuide } from './components/IntegrationGuide';
 
-type Tab = 'overview' | 'resident' | 'master' | 'architecture' | 'tests';
+type Tab = 'overview' | 'resident' | 'master' | 'architecture' | 'tests' | 'integration';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -18,7 +19,8 @@ function App() {
     { key: 'resident' as Tab, label: 'Житель', icon: MessageCircle },
     { key: 'master' as Tab, label: 'Мастер', icon: Wrench },
     { key: 'architecture' as Tab, label: 'Архитектура', icon: Layout },
-    { key: 'tests' as Tab, label: 'Тесты', icon: FlaskConical }
+    { key: 'tests' as Tab, label: 'Тесты', icon: FlaskConical },
+    { key: 'integration' as Tab, label: 'MAX', icon: Plug }
   ];
 
   return (
@@ -38,7 +40,7 @@ function App() {
             </div>
             
             {/* Desktop tabs */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1">
               {tabs.map(tab => (
                 <button
                   key={tab.key}
@@ -56,13 +58,31 @@ function App() {
             </nav>
             
             {/* Status */}
-            <div className="hidden md:flex items-center gap-2 text-xs text-gray-500">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-gray-500">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                 MVP Demo
               </span>
             </div>
           </div>
+          
+          {/* Tablet tabs */}
+          <nav className="lg:hidden flex items-center gap-1 overflow-x-auto pb-2 -mx-4 px-4">
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                  activeTab === tab.key 
+                    ? 'bg-blue-50 text-blue-700' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
       
@@ -86,11 +106,12 @@ function App() {
           )}
           {activeTab === 'architecture' && <ArchitectureView />}
           {activeTab === 'tests' && <TestScenarios />}
+          {activeTab === 'integration' && <IntegrationGuide />}
         </div>
       </main>
       
       {/* Mobile bottom nav */}
-      <nav className="md:hidden bg-white border-t flex shrink-0">
+      <nav className="lg:hidden bg-white border-t flex shrink-0">
         {tabs.map(tab => (
           <button
             key={tab.key}
