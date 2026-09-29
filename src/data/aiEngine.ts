@@ -18,43 +18,43 @@ const SAFETY_SIGNALS = [
 // Keywords for text classification
 const CATEGORY_KEYWORDS: Record<string, { words: string[]; subcategory: string }[]> = {
   WATER_SUPPLY: [
-    { words: ['течёт', 'течет', 'протечка', 'труба', 'вода на полу', 'лужа', 'затопл'], subcategory: 'PIPE_LEAK' },
-    { words: ['нет воды', 'вода не идёт', 'перекрыли воду', 'водоснабж'], subcategory: 'NO_WATER' },
-    { words: ['грязная вода', 'ржавая вода', 'мутная вода', 'плохая вода'], subcategory: 'DIRTY_WATER' },
-    { words: ['давление', 'слабый напор', 'тонкая струя'], subcategory: 'LOW_PRESSURE' }
+    { words: ['теч', 'протечк', 'труб', 'вода на полу', 'луж', 'затопл', 'капает', 'капают', 'мокр'], subcategory: 'PIPE_LEAK' },
+    { words: ['нет воды', 'вода не идёт', 'перекрыли воду', 'водоснабж', 'отключили воду'], subcategory: 'NO_WATER' },
+    { words: ['грязная вода', 'ржавая вода', 'мутная вода', 'плохая вода', 'вода с запахом'], subcategory: 'DIRTY_WATER' },
+    { words: ['давлен', 'слабый напор', 'тонкая струя'], subcategory: 'LOW_PRESSURE' }
   ],
   ELECTRICITY: [
-    { words: ['нет света', 'не горит', 'лампочка', 'освещен', 'лестниц.*свет', 'подъезд.*темно'], subcategory: 'NO_LIGHT_STAIRWELL' },
-    { words: ['провод', 'оголённый', 'обнажён', 'искр', 'короткое замыкание'], subcategory: 'EXPOSED_WIRES' },
+    { words: ['нет света', 'не горит', 'лампочк', 'освещен', 'темно', 'свет не работа', 'электричеств'], subcategory: 'NO_LIGHT_STAIRWELL' },
+    { words: ['провод', 'оголён', 'обнаж', 'искр', 'короткое замыкание', 'бьёт током'], subcategory: 'EXPOSED_WIRES' },
     { words: ['щиток', 'автомат', 'пробк', 'электрощит'], subcategory: 'ELECTRICAL_PANEL' }
   ],
   HEATING: [
-    { words: ['нет отоплен', 'холодн.*батаре', 'не греет', 'отоплен.*не работа'], subcategory: 'NO_HEATING' },
-    { words: ['батарея течёт', 'радиатор', 'протечк.*батаре'], subcategory: 'RADIATOR_LEAK' },
+    { words: ['нет отоплен', 'холодн.*батаре', 'не греет', 'отоплен.*не работа', 'батареи холодн'], subcategory: 'NO_HEATING' },
+    { words: ['батарея теч', 'радиатор', 'протечк.*батаре'], subcategory: 'RADIATOR_LEAK' },
     { words: ['холодно в квартир', 'низк.*температур', 'не топят'], subcategory: 'LOW_TEMPERATURE' }
   ],
   CLEANING: [
-    { words: ['грязн.*подъезд', 'грязно', 'не мыли', 'уборк', 'мусор в подъезд'], subcategory: 'DIRTY_STAIRWELL' },
+    { words: ['грязн.*подъезд', 'грязно', 'не мыли', 'уборк', 'мусор в подъезд', 'помойк'], subcategory: 'DIRTY_STAIRWELL' },
     { words: ['грязь у вход', 'грязный вход', 'не убран'], subcategory: 'DIRTY_ENTRANCE' },
-    { words: ['мусор', 'переполн', 'контейнер', 'бак.*мусор', 'отход'], subcategory: 'TRASH_OVERFLOW' }
+    { words: ['мусор', 'переполн', 'контейнер', 'бак.*мусор', 'отход', 'воняет'], subcategory: 'TRASH_OVERFLOW' }
   ],
   YARD: [
-    { words: ['упавш.*дерев', 'дерево упал', 'повален.*дерев', 'ветк.*дорог'], subcategory: 'FALLEN_TREE' },
+    { words: ['упавш.*дерев', 'дерево упал', 'повален.*дерев', 'ветк.*дорог', 'дерево на машин'], subcategory: 'FALLEN_TREE' },
     { words: ['сломан.*лавочк', 'поврежд.*лавк', 'скамейк'], subcategory: 'DAMAGED_BENCH' },
     { words: ['площадк.*детск', 'горк.*сломан', 'качел'], subcategory: 'DAMAGED_PLAYGROUND' },
-    { words: ['яма.*дорог', 'асфальт', 'покрыти.*поврежд', 'тротуар'], subcategory: 'ROAD_DAMAGE' }
+    { words: ['яма.*дорог', 'асфальт', 'покрыти.*поврежд', 'тротуар', 'дырка в дорог'], subcategory: 'ROAD_DAMAGE' }
   ],
   DOOR: [
-    { words: ['дверь.*сломан', 'дверь.*не закрыв', 'входная дверь', 'дверь подъезд'], subcategory: 'BROKEN_ENTRY_DOOR' },
+    { words: ['дверь.*сломан', 'дверь.*не закрыв', 'входная дверь', 'дверь подъезд', 'дверь не работа'], subcategory: 'BROKEN_ENTRY_DOOR' },
     { words: ['замок.*сломан', 'замок.*не работа', 'ключ', 'не открыв.*двер'], subcategory: 'BROKEN_LOCK' },
     { words: ['домофон', 'не работа.*домофон', 'код не набирает'], subcategory: 'BROKEN_INTERCOM' }
   ],
   ELEVATOR: [
-    { words: ['лифт.*не работа', 'лифт.*сломал', 'лифт.*стои'], subcategory: 'ELEVATOR_NOT_WORKING' },
+    { words: ['лифт.*не работа', 'лифт.*сломал', 'лифт.*стои', 'лифт не едет'], subcategory: 'ELEVATOR_NOT_WORKING' },
     { words: ['лифт.*шум', 'лифт.*стуч', 'лифт.*грохоч'], subcategory: 'ELEVATOR_NOISE' }
   ],
   ROOF: [
-    { words: ['крыш.*течёт', 'потолок.*мокр', 'протечк.*сверху', 'потолок.*течёт'], subcategory: 'ROOF_LEAK' },
+    { words: ['крыш.*теч', 'потолок.*мокр', 'протечк.*сверху', 'потолок.*теч', 'капает с потолка'], subcategory: 'ROOF_LEAK' },
     { words: ['крыш.*поврежд', 'кровл', 'чердак'], subcategory: 'DAMAGED_ROOF' }
   ]
 };
@@ -119,9 +119,12 @@ export async function analyzeText(text: string): Promise<TextAnalysisResult> {
   for (const [categoryId, subcategories] of Object.entries(CATEGORY_KEYWORDS)) {
     for (const sub of subcategories) {
       for (const word of sub.words) {
-        const regex = new RegExp(word, 'i');
+        // Используем частичное совпадение для учёта морфологии
+        // Например, "труб" найдёт "труба", "трубы", "трубой"
+        const searchWord = word.length > 3 ? word.slice(0, -1) : word;
+        const regex = new RegExp(searchWord, 'i');
         if (regex.test(lowerText)) {
-          const score = 0.7 + Math.random() * 0.25;
+          const score = 0.75 + Math.random() * 0.2;
           if (score > bestConfidence) {
             bestConfidence = score;
             bestCategory = categoryId;
@@ -146,12 +149,14 @@ export async function analyzeText(text: string): Promise<TextAnalysisResult> {
   const locationPatterns = [
     { pattern: /подвал/i, value: 'Подвал' },
     { pattern: /чердак/i, value: 'Чердак' },
-    { pattern: /подъезд\s*(\d+)/i, value: 'Подъезд' },
-    { pattern: /(\d+)\s*этаж/i, value: 'Этаж' },
+    { pattern: /подъезд/i, value: 'Подъезд' },
+    { pattern: /этаж/i, value: 'Этаж' },
     { pattern: /лестниц/i, value: 'Лестница' },
     { pattern: /крыш/i, value: 'Крыша' },
     { pattern: /двор/i, value: 'Двор' },
-    { pattern: /квартир/i, value: 'Квартира' }
+    { pattern: /квартир/i, value: 'Квартира' },
+    { pattern: /вход/i, value: 'Вход' },
+    { pattern: /коридор/i, value: 'Коридор' }
   ];
   
   for (const loc of locationPatterns) {
@@ -160,6 +165,19 @@ export async function analyzeText(text: string): Promise<TextAnalysisResult> {
       entities.push(loc.value);
       extractedFacts[loc.value.toLowerCase()] = match[0];
     }
+  }
+  
+  // Fallback: если текст достаточно длинный, но категория не определена,
+  // возвращаем OTHER_INCIDENT вместо NOT_INCIDENT
+  if (!bestCategory && text.length > 15) {
+    return {
+      category: null,
+      subcategory: null,
+      urgencySignals,
+      entities,
+      confidence: 0.5, // Средняя уверенность — нужно уточнение
+      extractedFacts
+    };
   }
   
   return {
@@ -406,6 +424,15 @@ export function fuseResults(
   }
   
   // Generate recommended questions based on missing info
+  if (missingInformation.includes('category')) {
+    recommendedQuestions.push({
+      id: 'q-category',
+      text: 'Уточните, пожалуйста, к какой категории относится проблема? (водоснабжение, электричество, уборка, двор, двери, лифт)',
+      field: 'category',
+      required: true
+    });
+  }
+  
   if (missingInformation.includes('location')) {
     recommendedQuestions.push({
       id: 'q-location',

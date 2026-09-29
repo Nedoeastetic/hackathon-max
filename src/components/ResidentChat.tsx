@@ -147,9 +147,15 @@ export function ResidentChat({ store }: Props) {
         store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
         
         if (fusion.classificationResult === 'NOT_INCIDENT') {
+          const message = inputMode === 'TEXT_ONLY'
+            ? '🔍 Не удалось определить проблему по описанию.\n\nПопробуйте описать подробнее или отправить фото повреждения.'
+            : inputMode === 'IMAGE_ONLY'
+            ? '🔍 На фото не удалось обнаружить проблему, связанную с домом.\n\nПопробуйте отправить другое фото или опишите проблему текстом.'
+            : '🔍 Не удалось определить проблему.\n\nПопробуйте описать подробнее или отправить другое фото.';
+          
           store.addMessage({
             role: 'ai',
-            content: '🔍 На фото не удалось обнаружить проблему, связанную с домом.\n\nПопробуйте отправить фото повреждения или опишите проблему.'
+            content: message
           });
           store.setIsProcessing(false);
           return;
