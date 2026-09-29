@@ -12,6 +12,23 @@ if (!TOKEN) {
   process.exit(1);
 }
 
+// Проверка токена на кириллические символы
+if (/[а-яА-Я]/.test(TOKEN)) {
+  console.error('❌ Ошибка: токен содержит кириллические символы!');
+  console.error('   Токен должен содержать только латинские буквы, цифры и специальные символы.');
+  console.error('   Проверьте файл bot/.env и убедитесь, что токен вставлен правильно.');
+  console.error('');
+  console.error('   Пример правильного токена: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+  process.exit(1);
+}
+
+// Проверка на невидимые символы (пробелы, переносы строк)
+if (TOKEN !== TOKEN.trim()) {
+  console.error('❌ Ошибка: токен содержит лишние пробелы или переносы строк!');
+  console.error('   Удалите пробелы в начале/конце токена в файле bot/.env');
+  process.exit(1);
+}
+
 const bot = new Bot(TOKEN);
 const store = new IncidentStore();
 
