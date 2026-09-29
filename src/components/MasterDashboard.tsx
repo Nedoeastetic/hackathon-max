@@ -77,9 +77,14 @@ export function MasterDashboard({ store }: Props) {
             <Wrench className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--max-text-primary)' }}>
-              {currentMaster.name}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--max-text-primary)' }}>
+                {currentMaster.name}
+              </h2>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: '#FFF4E6', color: '#FF8C00' }}>
+                демо-данные
+              </span>
+            </div>
             <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
               {getWorkerTypeName(currentMaster.workerType)} • {currentMaster.rating}⭐
             </p>

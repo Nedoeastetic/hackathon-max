@@ -65,16 +65,14 @@ export interface FusionResult {
   needsReview?: boolean;
 }
 
-// ====== Реальный ML API через прокси ======
-
-const PROXY_URL = 'http://localhost:3001';
+// ====== Реальный ML API (относительные пути) ======
 
 export async function analyzeImageReal(file: File): Promise<VisionAnalysisResult> {
   try {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${PROXY_URL}/api/vision/analyze`, {
+    const response = await fetch('/api/vision/analyze', {
       method: 'POST',
       body: formData
     });
@@ -93,7 +91,7 @@ export async function analyzeImageReal(file: File): Promise<VisionAnalysisResult
 
 export async function analyzeTextReal(text: string): Promise<TextAnalysisResult> {
   try {
-    const response = await fetch(`${PROXY_URL}/api/text/analyze`, {
+    const response = await fetch('/api/text/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
@@ -113,7 +111,7 @@ export async function analyzeTextReal(text: string): Promise<TextAnalysisResult>
 
 export async function checkMLHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${PROXY_URL}/api/health`);
+    const response = await fetch('/api/health');
     return response.ok;
   } catch {
     return false;
