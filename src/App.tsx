@@ -1,31 +1,48 @@
 import { useState } from 'react';
-import { Home, MessageCircle, Wrench, Layout, FlaskConical, Plug, ArrowLeft } from 'lucide-react';
+import { Home, Layout, FlaskConical, Plug } from 'lucide-react';
 import { useAppStore } from './store/useStore';
-import { ResidentChat } from './components/ResidentChat';
-import { MasterDashboard } from './components/MasterDashboard';
+import { RoleSelector } from './components/RoleSelector';
+import { ResidentView } from './components/ResidentView';
+import { MasterView } from './components/MasterView';
 import { ArchitectureView } from './components/ArchitectureView';
 import { OverviewPage } from './components/OverviewPage';
 import { TestScenarios } from './components/TestScenarios';
 import { IntegrationGuide } from './components/IntegrationGuide';
 
-type Tab = 'overview' | 'resident' | 'master' | 'architecture' | 'tests' | 'integration';
+type AppView = 'role-select' | 'resident' | 'master' | 'overview' | 'architecture' | 'tests' | 'integration';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [currentView, setCurrentView] = useState<AppView>('role-select');
   const store = useAppStore();
 
+  const handleSelectRole = (role: 'resident' | 'master') => {
+    setCurrentView(role);
+  };
+
+  const handleBack = () => {
+    setCurrentView('role-select');
+  };
+
+  // Если выбрана роль — показываем соответствующий интерфейс
+  if (currentView === 'resident') {
+    return <ResidentView store={store} onBack={handleBack} />;
+  }
+
+  if (currentView === 'master') {
+    return <MasterView store={store} onBack={handleBack} />;
+  }
+
+  // Навигация для остальных вкладок
   const tabs = [
-    { key: 'overview' as Tab, label: 'Главная', icon: Home },
-    { key: 'resident' as Tab, label: 'Житель', icon: MessageCircle },
-    { key: 'master' as Tab, label: 'Мастер', icon: Wrench },
-    { key: 'architecture' as Tab, label: 'Архитектура', icon: Layout },
-    { key: 'tests' as Tab, label: 'Тесты', icon: FlaskConical },
-    { key: 'integration' as Tab, label: 'MAX API', icon: Plug }
+    { key: 'overview' as const, label: 'Главная', icon: Home },
+    { key: 'architecture' as const, label: 'Архитектура', icon: Layout },
+    { key: 'tests' as const, label: 'Тесты', icon: FlaskConical },
+    { key: 'integration' as const, label: 'MAX API', icon: Plug }
   ];
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--max-surface)' }}>
-      {/* MAX-style Header */}
+      {/* Header */}
       <header 
         className="shrink-0 border-b"
         style={{ 
@@ -65,11 +82,11 @@ function App() {
               {tabs.map(tab => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => setCurrentView(tab.key)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
                   style={{
-                    background: activeTab === tab.key ? 'var(--max-primary-light)' : 'transparent',
-                    color: activeTab === tab.key ? 'var(--max-primary)' : 'var(--max-text-secondary)',
+                    background: currentView === tab.key ? 'var(--max-primary-light)' : 'transparent',
+                    color: currentView === tab.key ? 'var(--max-primary)' : 'var(--max-text-secondary)',
                   }}
                 >
                   <tab.icon className="w-4 h-4" />
@@ -97,49 +114,28 @@ function App() {
       {/* Main content */}
       <main className="flex-1 overflow-hidden">
         <div className="h-full max-w-5xl mx-auto">
-          {activeTab === 'overview' && <OverviewPage />}
-          {activeTab === 'resident' && (
-            <div className="h-full flex">
-              <div className="flex-1 max-w-md mx-auto w-full">
-                <ResidentChat store={store} />
-              </div>
-            </div>
-          )}
-          {activeTab === 'master' && (
-            <div className="h-full flex">
-              <div className="flex-1 max-w-xl mx-auto w-full">
-                <MasterDashboard store={store} />
-              </div>
-            </div>
-          )}
-          {activeTab === 'architecture' && <ArchitectureView />}
-          {activeTab === 'tests' && <TestScenarios />}
-          {activeTab === 'integration' && <IntegrationGuide />}
+          {currentView === 'role-select' && <RoleSelector onSelectRole={handleSelectRole} />}
+          {currentView === 'overview' && <OverviewPage />}
+          {currentView === 'architecture' && <ArchitectureView />}
+          {currentView === 'tests' && <TestScenarios />}
+          {currentView === 'integration' && <IntegrationGuide />}
         </div>
       </main>
       
-      {/* Mobile bottom nav - MAX style */}
-      <nav 
-        className="lg:hidden shrink-0 border-t flex"
-        style={{ 
-          background: 'var(--max-background)', 
-          borderColor: 'var(--max-border)' 
-        }}
-      >
-        {tabs.map(tab => {
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className="flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors"
-              style={{ color: isActive ? 'var(--max-primary)' : 'var(--max-text-secondary)' }}
-            >
-              <tab.icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Mobile bottom nav */}
+      <nav className="lg:hidden bg-white border-t flex shrink-0">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setCurrentView(tab.key)}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-xs transition-colors ${
+              currentView === tab.key ? 'text-blue-600' : 'text-gray-500'
+            }`}
+          >
+            <tab.icon className="w-5 h-5" />
+            <span className="text-[10px]">{tab.label}</span>
+          </button>
+        ))}
       </nav>
     </div>
   );
