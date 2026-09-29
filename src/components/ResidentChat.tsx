@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Loader2, CheckCircle, Paperclip } from 'lucide-react';
+import { Send, Camera, Loader2, CheckCircle, X } from 'lucide-react';
 import { AppStore } from '../store/useStore';
 import { analyzeText, analyzeImage, fuseResults } from '../data/aiEngine';
 import { getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
@@ -12,11 +12,15 @@ interface Props {
 
 export function ResidentChat({ store }: Props) {
   const [input, setInput] = useState('');
-  const [showImageInput, setShowImageInput] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showDemoMode, setShowDemoMode] = useState(false);
   const [selectedImageType, setSelectedImageType] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [incidentDraft, setIncidentDraft] = useState<{
     text?: string;
+    imageFile?: File;
     imageType?: string;
     fusion?: FusionResult;
     answers: Record<string, string>;
@@ -25,6 +29,18 @@ export function ResidentChat({ store }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [store.messages]);
+
+  // Закрытие меню при клике вне его
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const menu = document.getElementById('photo-menu');
+      if (menu && !menu.contains(e.target as Node) && !(e.target as Element).closest('button')) {
+        menu.style.display = 'none';
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Уведомления о статусе
   const notifiedIncidents = useRef(new Set<string>());
@@ -56,21 +72,60 @@ export function ResidentChat({ store }: Props) {
     }
   }, [store.incidents]);
 
+  // Обработка выбора файла
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      // Создаём превью
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Удалить выбранное фото
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Открыть диалог выбора файла
+  const handleOpenFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleSend = async () => {
-    if (!input.trim() && !showImageInput) return;
-    
     const text = input.trim();
-    const hasImage = showImageInput && selectedImageType;
-    const inputMode: InputMode = hasImage && text ? 'TEXT_AND_IMAGE' : hasImage ? 'IMAGE_ONLY' : 'TEXT_ONLY';
+    const hasFile = !!selectedFile;
+    const hasDemoImage = showDemoMode && selectedImageType;
     
+    if (!text && !hasFile && !hasDemoImage) return;
+    
+    const inputMode: InputMode = (hasFile || hasDemoImage) && text ? 'TEXT_AND_IMAGE' : (hasFile || hasDemoImage) ? 'IMAGE_ONLY' : 'TEXT_ONLY';
+    
+    // Добавляем сообщение пользователя
+    const messageContent = text || (hasDemoImage ? `[Демо: ${selectedImageType}]` : '[Фото]');
     store.addMessage({
       role: 'user',
-      content: text || `[Фото: ${selectedImageType}]`,
-      media: hasImage ? [{ id: 'img-1', type: 'image', url: '' }] : undefined
+      content: messageContent,
+      media: (hasFile || hasDemoImage) ? [{ id: 'img-1', type: 'image', url: imagePreview || '' }] : undefined
     });
     
     setInput('');
-    setShowImageInput(false);
+    setSelectedFile(null);
+    setImagePreview(null);
+    setShowDemoMode(false);
+    setSelectedImageType('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
     store.setIsProcessing(true);
     
     setTimeout(async () => {
@@ -81,7 +136,12 @@ export function ResidentChat({ store }: Props) {
       
       try {
         const textResult = text ? await analyzeText(text) : null;
-        const visionResult = hasImage ? await analyzeImage(selectedImageType) : null;
+        
+        // Для демо-режима используем симуляцию
+        // Для реального файла - тоже симуляция (в продакшене здесь будет загрузка на сервер)
+        const imageDesc = hasDemoImage ? selectedImageType : (hasFile ? 'загруженное фото' : undefined);
+        const visionResult = imageDesc ? await analyzeImage(imageDesc) : null;
+        
         const fusion = fuseResults(textResult, visionResult, inputMode);
         
         store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
@@ -113,7 +173,13 @@ export function ResidentChat({ store }: Props) {
           return;
         }
         
-        setIncidentDraft(prev => ({ ...prev, text, imageType: selectedImageType, fusion }));
+        setIncidentDraft(prev => ({ 
+          ...prev, 
+          text, 
+          imageFile: selectedFile || undefined,
+          imageType: selectedImageType || undefined,
+          fusion 
+        }));
         
         if (fusion.recommendedQuestions.length > 0 && fusion.classificationResult !== 'KNOWN_INCIDENT') {
           const question = fusion.recommendedQuestions[0];
@@ -172,7 +238,7 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
       category: fusion.category,
       subcategory: fusion.subcategory,
       description: incidentDraft.text || 'По фотографии',
-      media: incidentDraft.imageType ? [{ id: 'img-1', type: 'image', url: '' }] : [],
+      media: (incidentDraft.imageFile || incidentDraft.imageType) ? [{ id: 'img-1', type: 'image', url: imagePreview || '' }] : [],
       severity: fusion.severity,
       confidence: fusion.confidence,
       location: incidentDraft.answers.location || 'Не указано',
@@ -183,7 +249,7 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
       assignedWorkerName: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      inputMode: incidentDraft.imageType && incidentDraft.text ? 'TEXT_AND_IMAGE' : incidentDraft.imageType ? 'IMAGE_ONLY' : 'TEXT_ONLY',
+      inputMode: (incidentDraft.imageFile || incidentDraft.imageType) && incidentDraft.text ? 'TEXT_AND_IMAGE' : (incidentDraft.imageFile || incidentDraft.imageType) ? 'IMAGE_ONLY' : 'TEXT_ONLY',
       fusionResult: fusion,
       statusHistory: [
         { from: null, to: 'NEW', timestamp: Date.now(), by: 'system' },
@@ -243,6 +309,8 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
     store.pendingFusion.recommendedQuestions.length <= store.clarificationStep && 
     !store.currentIncident;
 
+  const hasAttachment = selectedFile || (showDemoMode && selectedImageType);
+
   return (
     <div className="flex flex-col h-full">
       {/* MAX-style chat header */}
@@ -283,12 +351,12 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
         </select>
       </div>
       
-      {/* Messages area - MAX style */}
+      {/* Messages area */}
       <div 
         className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
         style={{ background: 'var(--max-surface)' }}
       >
-        {store.messages.map((msg, idx) => (
+        {store.messages.map((msg) => (
           <div 
             key={msg.id} 
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
@@ -297,7 +365,19 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
               <p className="text-sm whitespace-pre-line" style={{ color: 'var(--max-bubble-text)' }}>
                 {msg.content}
               </p>
-              {msg.media && (
+              {msg.media && msg.media[0]?.url && (
+                <div 
+                  className="mt-2 rounded-xl overflow-hidden"
+                  style={{ background: 'rgba(0,0,0,0.05)' }}
+                >
+                  <img 
+                    src={msg.media[0].url} 
+                    alt="Прикреплённое фото" 
+                    className="max-w-full h-auto max-h-48 object-cover"
+                  />
+                </div>
+              )}
+              {msg.media && !msg.media[0]?.url && (
                 <div 
                   className="mt-2 rounded-xl h-28 w-36 flex items-center justify-center"
                   style={{ background: 'rgba(0,0,0,0.05)' }}
@@ -388,12 +468,78 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
         </div>
       )}
       
-      {/* Image selector */}
-      {showImageInput && (
+      {/* File preview */}
+      {(selectedFile || (showDemoMode && selectedImageType)) && (
+        <div 
+          className="px-4 py-2 shrink-0 flex items-center gap-2"
+          style={{ background: 'var(--max-background)', borderTop: '1px solid var(--max-border)' }}
+        >
+          {imagePreview && (
+            <div className="relative">
+              <img 
+                src={imagePreview} 
+                alt="Превью" 
+                className="w-16 h-16 object-cover rounded-lg"
+              />
+              <button
+                onClick={handleRemoveFile}
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--max-error)' }}
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+          )}
+          {showDemoMode && selectedImageType && !imagePreview && (
+            <div className="relative">
+              <div 
+                className="w-16 h-16 rounded-lg flex items-center justify-center text-2xl"
+                style={{ background: 'var(--max-surface)' }}
+              >
+                {selectedImageType.includes('протечк') ? '💧' : 
+                 selectedImageType.includes('гряз') ? '🧹' :
+                 selectedImageType.includes('дерево') ? '🌳' :
+                 selectedImageType.includes('двер') ? '🚪' :
+                 selectedImageType.includes('кот') ? '🐱' : '❓'}
+              </div>
+              <button
+                onClick={() => {
+                  setShowDemoMode(false);
+                  setSelectedImageType('');
+                }}
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--max-error)' }}
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+          )}
+          <div className="flex-1">
+            <p className="text-xs font-medium" style={{ color: 'var(--max-text-primary)' }}>
+              {selectedFile ? selectedFile.name : `Демо: ${selectedImageType}`}
+            </p>
+            <p className="text-[10px]" style={{ color: 'var(--max-text-secondary)' }}>
+              {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Тестовое изображение'}
+            </p>
+          </div>
+        </div>
+      )}
+      
+      {/* Demo mode selector */}
+      {showDemoMode && !selectedImageType && (
         <div className="px-4 py-2 shrink-0" style={{ background: 'var(--max-background)', borderTop: '1px solid var(--max-border)' }}>
-          <p className="text-xs mb-2 font-medium" style={{ color: 'var(--max-text-secondary)' }}>
-            Выберите тип фото
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium" style={{ color: 'var(--max-text-secondary)' }}>
+              Демо-режим: выберите тип фото
+            </p>
+            <button
+              onClick={() => setShowDemoMode(false)}
+              className="text-xs underline"
+              style={{ color: 'var(--max-primary)' }}
+            >
+              Отмена
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'протечка', label: '💧 Протечка' },
@@ -408,9 +554,9 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
                 onClick={() => setSelectedImageType(img.id)}
                 className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
                 style={{
-                  background: selectedImageType === img.id ? 'var(--max-primary)' : 'var(--max-surface)',
-                  color: selectedImageType === img.id ? 'white' : 'var(--max-text-primary)',
-                  border: `1px solid ${selectedImageType === img.id ? 'var(--max-primary)' : 'var(--max-border)'}`
+                  background: 'var(--max-surface)',
+                  color: 'var(--max-text-primary)',
+                  border: '1px solid var(--max-border)'
                 }}
               >
                 {img.label}
@@ -420,7 +566,16 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
         </div>
       )}
       
-      {/* Input area - MAX style */}
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      
+      {/* Input area */}
       <div 
         className="shrink-0 border-t px-3 py-2"
         style={{ 
@@ -448,16 +603,61 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
           </div>
         ) : (
           <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setShowImageInput(!showImageInput)}
-              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all"
-              style={{ 
-                background: showImageInput ? 'var(--max-primary)' : 'var(--max-surface)',
-                color: showImageInput ? 'white' : 'var(--max-text-secondary)'
-              }}
-            >
-              <Camera className="w-4 h-4" />
-            </button>
+            {/* Camera button - открывает меню выбора */}
+            <div className="relative group">
+              <button
+                onClick={() => {
+                  const menu = document.getElementById('photo-menu');
+                  if (menu) {
+                    menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+                  }
+                }}
+                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all"
+                style={{ 
+                  background: hasAttachment ? 'var(--max-primary)' : 'var(--max-surface)',
+                  color: hasAttachment ? 'white' : 'var(--max-text-secondary)'
+                }}
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              
+              {/* Выпадающее меню */}
+              <div
+                id="photo-menu"
+                className="absolute bottom-12 left-0 flex-col gap-1 p-1 rounded-xl shadow-lg z-10"
+                style={{ 
+                  background: 'var(--max-background)', 
+                  border: '1px solid var(--max-border)',
+                  display: 'none',
+                  minWidth: '180px'
+                }}
+              >
+                <button
+                  onClick={() => {
+                    handleOpenFilePicker();
+                    document.getElementById('photo-menu')!.style.display = 'none';
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left w-full transition-all"
+                  style={{ color: 'var(--max-text-primary)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--max-surface)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  📷 Загрузить фото
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDemoMode(true);
+                    document.getElementById('photo-menu')!.style.display = 'none';
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left w-full transition-all"
+                  style={{ color: 'var(--max-text-primary)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--max-surface)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  🎭 Демо-режим
+                </button>
+              </div>
+            </div>
             <input
               type="text"
               value={input}
@@ -468,7 +668,7 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
             />
             <button
               onClick={handleSend}
-              disabled={store.isProcessing || (!input.trim() && !showImageInput)}
+              disabled={store.isProcessing || (!input.trim() && !hasAttachment)}
               className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40"
               style={{ background: 'var(--max-primary)' }}
             >
