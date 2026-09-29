@@ -1,8 +1,8 @@
-import express from 'express';
-import cors from 'cors';
-import multer from 'multer';
-import fetch from 'node-fetch';
-import FormData from 'form-data';
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const fetch = require('node-fetch');
+const FormData = require('form-data');
 
 const app = express();
 const PORT = 3001;
