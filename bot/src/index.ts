@@ -1,9 +1,14 @@
+// Устанавливаем переменную окружения ДО всех импортов для отключения SSL проверки
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 import 'dotenv/config';
-import { Bot } from '@maxhub/max-bot-api';
 import { analyzeInput, AnalysisResult } from './ai/classifier.js';
 import { checkHealth } from './ai/api-client.js';
 import { categories, getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from './data/taxonomy.js';
 import { IncidentStore, Incident } from './store/incidents.js';
+
+// Динамический импорт Bot после установки переменных окружения
+const { Bot } = await import('@maxhub/max-bot-api');
 
 const TOKEN = process.env.MAX_BOT_TOKEN;
 
