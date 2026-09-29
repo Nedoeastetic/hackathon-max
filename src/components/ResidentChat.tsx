@@ -20,6 +20,7 @@ export function ResidentChat({ store }: Props) {
   const [editCategory, setEditCategory] = useState<string>('');
   const [editSubcategory, setEditSubcategory] = useState<string>('');
   const [editDescription, setEditDescription] = useState<string>('');
+  const [mlApiAvailable, setMlApiAvailable] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [incidentDraft, setIncidentDraft] = useState<{
@@ -33,6 +34,14 @@ export function ResidentChat({ store }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [store.messages]);
+
+  // Проверка доступности ML API
+  useEffect(() => {
+    checkMLHealth().then(available => {
+      setMlApiAvailable(available);
+      console.log(available ? '✅ ML API доступен' : '⚠️ ML API недоступен, используется локальная симуляция');
+    });
+  }, []);
 
   // Закрытие меню при клике вне его
   useEffect(() => {
@@ -184,13 +193,19 @@ export function ResidentChat({ store }: Props) {
       
       try {
         // Проверяем доступность прокси-сервера
-        const proxyAvailable = await checkMLHealth();
+        let proxyAvailable = false;
+        try {
+          proxyAvailable = await checkMLHealth();
+        } catch {
+          proxyAvailable = false;
+        }
         
         let textResult = null;
         let visionResult = null;
         
         if (proxyAvailable) {
           // Используем реальный ML API через прокси
+          console.log('✅ Используем ML API через прокси');
           if (text) {
             textResult = await analyzeTextReal(text);
           }
@@ -202,14 +217,17 @@ export function ResidentChat({ store }: Props) {
             visionResult = await analyzeImage(selectedImageType);
           }
         } else {
-          // Fallback на симуляцию
+          // Fallback на локальную симуляцию
+          console.log('⚠️ ML API недоступен, используем локальную симуляцию');
           textResult = text ? await analyzeText(text) : null;
           
+          // Если загружен реальный файл без текста — используем симуляцию
           if (hasFile && !text && !hasDemoImage) {
+            // В режиме симуляции просим описать проблему
             store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
             store.addMessage({
               role: 'ai',
-              content: '📷 Фото получено! Прокси-сервер недоступен.\n\nЗапустите прокси-сервер командой:\n```\nnode proxy-server.js\n```\n\nИли опишите проблему текстом.'
+              content: '📷 Фото получено!\n\n💡 В режиме симуляции опишите проблему текстом для более точной классификации.\n\nИли выберите демо-режим для тестирования.'
             });
             store.setIsProcessing(false);
             return;
@@ -438,6 +456,8 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
           </h2>
           <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
             бот • онлайн
+            {mlApiAvailable === true && ' • ML API ✓'}
+            {mlApiAvailable === false && ' • Симуляция'}
           </p>
         </div>
         <select
