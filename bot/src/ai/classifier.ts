@@ -63,6 +63,50 @@ const CV_CLASS_TO_CATEGORY: Record<string, string> = {
   not_incident: 'NOT_INCIDENT'
 };
 
+// Локальная классификация на основе ключевых слов (fallback)
+const LOCAL_KEYWORDS: Record<string, { words: string[]; subcategory: string; category: string }> = {
+  WATER_SUPPLY: [
+    { words: ['теч', 'протечк', 'труб', 'вода', 'луж', 'затопл', 'капает'], subcategory: 'PIPE_LEAK', category: 'WATER_SUPPLY' },
+    { words: ['нет воды', 'вода не идёт'], subcategory: 'NO_WATER', category: 'WATER_SUPPLY' }
+  ],
+  ELECTRICITY: [
+    { words: ['нет света', 'не горит', 'свет не работа', 'лампочк', 'электричеств'], subcategory: 'NO_LIGHT_STAIRWELL', category: 'ELECTRICITY' },
+    { words: ['провод', 'оголён', 'искр'], subcategory: 'EXPOSED_WIRES', category: 'ELECTRICITY' }
+  ],
+  ELEVATOR: [
+    { words: ['лифт не работа', 'лифт сломал', 'лифт не едет'], subcategory: 'ELEVATOR_NOT_WORKING', category: 'ELEVATOR' }
+  ],
+  CLEANING: [
+    { words: ['грязно', 'уборк', 'мусор'], subcategory: 'DIRTY_STAIRWELL', category: 'CLEANING' }
+  ],
+  YARD: [
+    { words: ['дерево упал', 'упавш дерев'], subcategory: 'FALLEN_TREE', category: 'YARD' }
+  ],
+  DOOR: [
+    { words: ['дверь сломан', 'дверь не закрыв'], subcategory: 'BROKEN_ENTRY_DOOR', category: 'DOOR' }
+  ]
+};
+
+function localClassify(text: string): { category: string; subcategory: string; confidence: number } | null {
+  const lowerText = text.toLowerCase();
+  
+  for (const [categoryId, items] of Object.entries(LOCAL_KEYWORDS)) {
+    for (const item of items) {
+      for (const word of item.words) {
+        if (lowerText.includes(word)) {
+          return {
+            category: item.category,
+            subcategory: item.subcategory,
+            confidence: 0.75
+          };
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
 export async function analyzeInput(input: AnalysisInput): Promise<AnalysisResult> {
   try {
     let textResult: TextAnalysisResult | null = null;
@@ -70,7 +114,24 @@ export async function analyzeInput(input: AnalysisInput): Promise<AnalysisResult
 
     // Анализ текста
     if (input.text && (input.mode === 'TEXT_ONLY' || input.mode === 'TEXT_AND_IMAGE')) {
+      console.log(`📤 Отправляем в ML API: "${input.text}"`);
       textResult = await analyzeText(input.text);
+      
+      // Если ML API вернул NOT_INCIDENT с высокой уверенностью, но текст содержит ключевые слова
+      // используем локальную классификацию как fallback
+      if (textResult.confidence > 0.9 && !textResult.category) {
+        const localResult = localClassify(input.text);
+        if (localResult) {
+          console.log(`🔄 ML API вернул NOT_INCIDENT, но локальная классификация нашла: ${localResult.category}/${localResult.subcategory}`);
+          textResult = {
+            category: localResult.category,
+            subcategory: localResult.subcategory,
+            confidence: localResult.confidence,
+            top3: [{ category: localResult.category, subcategory: localResult.subcategory, confidence: localResult.confidence }],
+            modelVersion: 'local-fallback'
+          };
+        }
+      }
     }
 
     // Анализ изображения
@@ -82,7 +143,27 @@ export async function analyzeInput(input: AnalysisInput): Promise<AnalysisResult
     return fuseResults(textResult, visionResult, input.text || '');
   } catch (error) {
     console.error('❌ Analysis error:', error);
-    // Fallback: если API недоступен
+    
+    // Fallback на локальную классификацию если API недоступен
+    if (input.text) {
+      const localResult = localClassify(input.text);
+      if (localResult) {
+        console.log(`⚠️ API недоступен, используем локальную классификацию: ${localResult.category}/${localResult.subcategory}`);
+        return {
+          classificationResult: 'KNOWN_INCIDENT',
+          category: localResult.category,
+          subcategory: localResult.subcategory,
+          severity: 'MEDIUM',
+          confidence: localResult.confidence,
+          recommendedWorkerType: WORKER_MAPPING[localResult.category] || 'DISPATCHER',
+          recommendedQuestions: [],
+          urgencySignals: [],
+          fusionLevel: 'LOW',
+          fusionReason: 'Локальная классификация (API недоступен)'
+        };
+      }
+    }
+    
     return {
       classificationResult: 'NOT_INCIDENT',
       category: null,
