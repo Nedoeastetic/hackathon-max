@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Бот (Node.js + Express)
+  bot:
+    build: ./bot
+    container_name: max-bot
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MAX_BOT_TOKEN=${MAX_BOT_TOKEN}
+      - AI_API_URL=${AI_API_URL:-https://v3258578.hosted-by-vdsina.ru}
+    volumes:
+      # SQLite database persistence
+      - bot-data:/app/data
+    networks:
+      - max-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Мини-приложение (Nginx)
+  miniapp:
+    build: ./miniapp
+    container_name: max-miniapp
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - bot
+    networks:
+      - max-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  max-network:
+    driver: bridge
+
+volumes:
+  bot-data:
+    driver: local

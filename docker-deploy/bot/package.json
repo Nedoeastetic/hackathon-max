@@ -1,0 +1,21 @@
+{
+  "name": "max-hackathon-bot",
+  "version": "1.0.0",
+  "description": "MAX Hackathon Bot with AI Integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^9.4.3",
+    "node-fetch": "^2.7.0",
+    "form-data": "^4.0.0",
+    "multer": "^1.4.5-lts.1",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
