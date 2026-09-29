@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Incident, ChatMessage, Master, FusionResult, IncidentStatus } from '../types';
+import { Incident, ChatMessage, Master, IncidentStatus } from '../types';
+import { FusionResult } from '../data/aiEngine';
 import { mockMasters, existingIncidents } from '../data/mockData';
 
 // Simple state hook

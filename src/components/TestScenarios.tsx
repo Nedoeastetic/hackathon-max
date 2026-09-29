@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Play, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { analyzeText, analyzeImage, fuseResults } from '../data/aiEngine';
-import { InputMode, FusionResult } from '../types';
+import { analyzeText, analyzeImage, fuseResults, FusionResult } from '../data/aiEngine';
+import { InputMode } from '../types';
 
 interface TestCase {
   id: string;
@@ -27,10 +27,10 @@ const testCases: TestCase[] = [
   { id: 'i3', name: 'Фото дерева', mode: 'IMAGE_ONLY', imageType: 'дерево упало', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'YARD' },
   { id: 'i4', name: 'Фото двери', mode: 'IMAGE_ONLY', imageType: 'дверь сломана', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'DOOR' },
   { id: 'i5', name: 'Фото кота', mode: 'IMAGE_ONLY', imageType: 'кот', expectedResult: 'NOT_INCIDENT' },
-  { id: 'i6', name: 'Неизвестное', mode: 'IMAGE_ONLY', imageType: 'повреждение неизвестное', expectedResult: 'OTHER_INCIDENT' },
+  { id: 'i6', name: 'Неизвестное', mode: 'IMAGE_ONLY', imageType: 'повреждение неизвестное', expectedResult: 'NEEDS_CLARIFICATION' },
   { id: 'ti1', name: 'Текст + фото', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба', imageType: 'протечка', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'WATER_SUPPLY' },
-  { id: 'ti2', name: 'Противоречие', mode: 'TEXT_AND_IMAGE', text: 'Упало дерево', imageType: 'протечка', expectedResult: 'CONFLICT' },
-  { id: 'ti3', name: 'Нерелевантное фото', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба в подвале', imageType: 'кот', expectedResult: 'CONFLICT' },
+  { id: 'ti2', name: 'Противоречие', mode: 'TEXT_AND_IMAGE', text: 'Упало дерево', imageType: 'протечка', expectedResult: 'NEEDS_CLARIFICATION' },
+  { id: 'ti3', name: 'Нерелевантное фото', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба в подвале', imageType: 'кот', expectedResult: 'NEEDS_CLARIFICATION' },
 ];
 
 export function TestScenarios() {
@@ -52,10 +52,8 @@ export function TestScenarios() {
         if (tc.expectedCategory && fusion.category !== tc.expectedCategory) passed = false;
       } else if (tc.expectedResult === 'NOT_INCIDENT') {
         passed = fusion.classificationResult === 'NOT_INCIDENT';
-      } else if (tc.expectedResult === 'OTHER_INCIDENT') {
-        passed = fusion.classificationResult === 'OTHER_INCIDENT';
-      } else if (tc.expectedResult === 'CONFLICT') {
-        passed = fusion.classificationResult === 'CONFLICT' || fusion.conflictingInformation.length > 0;
+      } else if (tc.expectedResult === 'NEEDS_CLARIFICATION') {
+        passed = fusion.classificationResult === 'NEEDS_CLARIFICATION';
       }
       
       setResults(prev => ({ ...prev, [tc.id]: { result: fusion, passed } }));

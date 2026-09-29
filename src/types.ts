@@ -12,11 +12,8 @@ export type IncidentStatus =
 
 export type ClassificationResult = 
   | 'KNOWN_INCIDENT' 
-  | 'OTHER_INCIDENT' 
   | 'NOT_INCIDENT' 
-  | 'NEEDS_CLARIFICATION' 
-  | 'CONFLICT' 
-  | 'SYSTEM_ERROR';
+  | 'NEEDS_CLARIFICATION';
 
 export type WorkerType = 
   | 'PLUMBER' 
@@ -66,21 +63,7 @@ export interface VisionAnalysisResult {
   confidence: number;
 }
 
-export interface FusionResult {
-  incidentDetected: boolean;
-  classificationResult: ClassificationResult;
-  category: string | null;
-  subcategory: string | null;
-  severity: Severity;
-  confidence: number;
-  missingInformation: string[];
-  conflictingInformation: string[];
-  recommendedQuestions: ClarificationQuestion[];
-  recommendedWorkerType: WorkerType;
-  textConfidence: number;
-  visionConfidence: number;
-  fusionConfidence: number;
-}
+// FusionResult импортируется из aiEngine.ts где используется
 
 export interface ClarificationQuestion {
   id: string;
@@ -112,7 +95,7 @@ export interface Incident {
   createdAt: number;
   updatedAt: number;
   inputMode: InputMode;
-  fusionResult?: FusionResult;
+  fusionResult?: any; // FusionResult из aiEngine.ts
   statusHistory: StatusChange[];
 }
 

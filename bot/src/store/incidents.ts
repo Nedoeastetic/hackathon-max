@@ -14,6 +14,11 @@ export interface Incident {
   assignedWorker?: string;
   createdAt: number;
   updatedAt?: number;
+  // Fusion metadata (API v2.1)
+  fusionLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
+  fusionReason?: string;
+  needsReview?: boolean;
+  modelVersions?: { cv?: string; text?: string };
 }
 
 export class IncidentStore {

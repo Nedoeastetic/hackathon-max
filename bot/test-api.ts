@@ -45,6 +45,12 @@ async function testTextAnalysis() {
       console.log(`  Подкатегория: ${result.subcategory || 'N/A'}`);
       console.log(`  Уверенность: ${(result.confidence * 100).toFixed(1)}%`);
       console.log(`  Модель: ${result.modelVersion}`);
+      if (result.top3 && result.top3.length > 0) {
+        console.log(`  Top3:`);
+        result.top3.forEach((item, idx) => {
+          console.log(`    ${idx + 1}. ${item.subcategory} (${item.category}) - ${(item.confidence * 100).toFixed(1)}%`);
+        });
+      }
       console.log('');
     } catch (error) {
       console.error(`  ❌ Ошибка: ${error}`);
@@ -76,6 +82,12 @@ async function testVisionAnalysis() {
     console.log(`  Категория: ${result.category || 'N/A'}`);
     console.log(`  Уверенность: ${(result.confidence * 100).toFixed(1)}%`);
     console.log(`  Модель: ${result.modelVersion}`);
+    if (result.top3 && result.top3.length > 0) {
+      console.log(`  Top3:`);
+      result.top3.forEach((item, idx) => {
+        console.log(`    ${idx + 1}. ${item.class} (${item.category || 'null'}) - ${(item.confidence * 100).toFixed(1)}%`);
+      });
+    }
     console.log('');
   } catch (error) {
     console.error(`  ❌ Ошибка: ${error}`);

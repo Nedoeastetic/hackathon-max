@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Camera, Loader2, CheckCircle, X } from 'lucide-react';
 import { AppStore } from '../store/useStore';
-import { analyzeText, analyzeImage, fuseResults } from '../data/aiEngine';
+import { analyzeText, analyzeImage, fuseResults, FusionResult } from '../data/aiEngine';
 import { getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
-import { Incident, FusionResult, InputMode } from '../types';
+import { Incident, InputMode } from '../types';
 import { mockBuildings } from '../data/mockData';
 
 interface Props {
@@ -156,24 +156,6 @@ export function ResidentChat({ store }: Props) {
           store.addMessage({
             role: 'ai',
             content: message
-          });
-          store.setIsProcessing(false);
-          return;
-        }
-        
-        if (fusion.classificationResult === 'OTHER_INCIDENT') {
-          store.addMessage({
-            role: 'ai',
-            content: '🔍 Проблема связана с домом, но тип не удалось определить.\n\nОпишите подробнее, что произошло?'
-          });
-          store.setIsProcessing(false);
-          return;
-        }
-        
-        if (fusion.classificationResult === 'CONFLICT') {
-          store.addMessage({
-            role: 'ai',
-            content: '⚠️ Несоответствие между описанием и фото. Уточните, что произошло?'
           });
           store.setIsProcessing(false);
           return;

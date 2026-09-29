@@ -301,11 +301,23 @@ async function confirmIncident(ctx: any, userId: string, session: Session) {
     confidence: result.confidence,
     status: 'AVAILABLE',
     recommendedWorkerType: result.recommendedWorkerType,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    fusionLevel: result.fusionLevel,
+    fusionReason: result.fusionReason,
+    needsReview: result.needsReview,
+    modelVersions: result.modelVersions
   };
   
   store.create(incident);
   session.incidentId = incidentId;
+  
+  // Логируем fusion-информацию
+  if (result.fusionLevel) {
+    console.log(`🔗 Fusion [${result.fusionLevel}]: ${result.fusionReason}`);
+    if (result.needsReview) {
+      console.log(`⚠️ Заявка ${incidentId} требует ревью (fusion MEDIUM)`);
+    }
+  }
   
   await ctx.reply(
     `✅ Заявка #${incidentId} создана и отправлена исполнителям!\n\n` +

@@ -1,5 +1,10 @@
-// AI-классификатор: интеграция с реальным ML API
-import { analyzeText, analyzeImage, VisionAnalysisResult, TextAnalysisResult } from './api-client.js';
+// AI-классификатор v2.1: интеграция с ML API + fusion по top3
+import { 
+  analyzeText, 
+  analyzeImage, 
+  VisionAnalysisResult, 
+  TextAnalysisResult 
+} from './api-client.js';
 
 export interface AnalysisInput {
   text?: string;
@@ -16,7 +21,7 @@ export interface ClarificationQuestion {
 }
 
 export interface AnalysisResult {
-  classificationResult: 'KNOWN_INCIDENT' | 'OTHER_INCIDENT' | 'NOT_INCIDENT' | 'NEEDS_CLARIFICATION' | 'CONFLICT';
+  classificationResult: 'KNOWN_INCIDENT' | 'NEEDS_CLARIFICATION' | 'NOT_INCIDENT';
   category: string | null;
   subcategory: string | null;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -24,6 +29,10 @@ export interface AnalysisResult {
   recommendedWorkerType: string;
   recommendedQuestions: ClarificationQuestion[];
   urgencySignals: string[];
+  fusionLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
+  fusionReason?: string;
+  needsReview?: boolean;
+  modelVersions?: { cv?: string; text?: string };
 }
 
 // Маппинг категорий на типы исполнителей
@@ -38,16 +47,21 @@ const WORKER_MAPPING: Record<string, string> = {
   ROOF: 'MAINTENANCE'
 };
 
-// Маппинг срочности
-const SEVERITY_MAPPING: Record<string, 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'> = {
-  LOW: 'LOW',
-  MEDIUM: 'MEDIUM',
-  HIGH: 'HIGH',
-  CRITICAL: 'CRITICAL'
-};
-
 // Safety-сигналы для повышения приоритета
 const SAFETY_SIGNALS = ['газ', 'пожар', 'дым', 'огонь', 'обрушен', 'угроз', 'провод', 'электрич'];
+
+// Маппинг CV-классов на категории
+const CV_CLASS_TO_CATEGORY: Record<string, string> = {
+  water_supply: 'WATER_SUPPLY',
+  heating: 'HEATING',
+  electricity: 'ELECTRICITY',
+  cleaning: 'CLEANING',
+  yard: 'YARD',
+  door: 'DOOR',
+  elevator: 'ELEVATOR',
+  roof: 'ROOF',
+  not_incident: 'NOT_INCIDENT'
+};
 
 export async function analyzeInput(input: AnalysisInput): Promise<AnalysisResult> {
   try {
@@ -82,7 +96,14 @@ export async function analyzeInput(input: AnalysisInput): Promise<AnalysisResult
   }
 }
 
-// Fusion engine: объединение результатов text + vision
+/**
+ * Fusion engine по документации API v2.1
+ * 
+ * Правила (по убыванию уверенности):
+ * HIGH:   category фото == category текста -> создаём заявку сразу
+ * MEDIUM: category текста встречается в top3 фото (или наоборот) -> заявка + needs_review
+ * LOW:    пересечений нет -> уточняющие вопросы жителю
+ */
 function fuseResults(
   textResult: TextAnalysisResult | null,
   visionResult: VisionAnalysisResult | null,
@@ -98,141 +119,19 @@ function fuseResults(
     }
   }
 
-  // MODE 1: TEXT ONLY
+  // ===== MODE 1: TEXT ONLY =====
   if (textResult && !visionResult) {
-    if (!textResult.category || textResult.confidence < 0.3) {
-      return {
-        classificationResult: 'NOT_INCIDENT',
-        category: null,
-        subcategory: null,
-        severity: 'LOW',
-        confidence: textResult.confidence,
-        recommendedWorkerType: 'DISPATCHER',
-        recommendedQuestions: [],
-        urgencySignals
-      };
-    }
-
-    const severity = urgencySignals.length > 0 ? 'CRITICAL' : 'MEDIUM';
-    
-    // Добавляем вопросы для уточнения
-    if (!originalText.includes('подвал') && !originalText.includes('подъезд') && !originalText.includes('квартир')) {
-      questions.push({
-        id: 'q-location',
-        text: 'Где именно находится проблема? (подъезд, этаж, место)',
-        field: 'location'
-      });
-    }
-
-    return {
-      classificationResult: questions.length > 0 ? 'NEEDS_CLARIFICATION' : 'KNOWN_INCIDENT',
-      category: textResult.category,
-      subcategory: textResult.subcategory,
-      severity,
-      confidence: textResult.confidence,
-      recommendedWorkerType: WORKER_MAPPING[textResult.category] || 'DISPATCHER',
-      recommendedQuestions: questions,
-      urgencySignals
-    };
+    return handleTextOnly(textResult, originalText, urgencySignals);
   }
 
-  // MODE 2: IMAGE ONLY
+  // ===== MODE 2: IMAGE ONLY =====
   if (visionResult && !textResult) {
-    if (visionResult.classificationResult === 'NOT_INCIDENT') {
-      return {
-        classificationResult: 'NOT_INCIDENT',
-        category: null,
-        subcategory: null,
-        severity: 'LOW',
-        confidence: visionResult.confidence,
-        recommendedWorkerType: 'DISPATCHER',
-        recommendedQuestions: [],
-        urgencySignals
-      };
-    }
-
-    if (visionResult.classificationResult === 'OTHER_INCIDENT') {
-      return {
-        classificationResult: 'OTHER_INCIDENT',
-        category: null,
-        subcategory: null,
-        severity: visionResult.visualSeverity || 'MEDIUM',
-        confidence: visionResult.confidence,
-        recommendedWorkerType: 'DISPATCHER',
-        recommendedQuestions: [
-          { id: 'q-desc', text: 'Опишите подробнее, что произошло?', field: 'description' }
-        ],
-        urgencySignals
-      };
-    }
-
-    // KNOWN_INCIDENT from vision
-    const severity = visionResult.visualSeverity || 'MEDIUM';
-    
-    // Всегда нужны уточнения для image-only
-    questions.push({
-      id: 'q-desc',
-      text: 'Опишите подробнее, что произошло?',
-      field: 'description'
-    });
-
-    return {
-      classificationResult: 'NEEDS_CLARIFICATION',
-      category: visionResult.category,
-      subcategory: visionResult.subcategory,
-      severity,
-      confidence: visionResult.confidence,
-      recommendedWorkerType: visionResult.category ? (WORKER_MAPPING[visionResult.category] || 'DISPATCHER') : 'DISPATCHER',
-      recommendedQuestions: questions,
-      urgencySignals
-    };
+    return handleImageOnly(visionResult, urgencySignals);
   }
 
-  // MODE 3: TEXT + IMAGE
+  // ===== MODE 3: TEXT + IMAGE =====
   if (textResult && visionResult) {
-    // Проверка конфликта
-    if (textResult.category && visionResult.category && textResult.category !== visionResult.category) {
-      return {
-        classificationResult: 'CONFLICT',
-        category: null,
-        subcategory: null,
-        severity: 'MEDIUM',
-        confidence: Math.min(textResult.confidence, visionResult.confidence) * 0.7,
-        recommendedWorkerType: 'DISPATCHER',
-        recommendedQuestions: [
-          { id: 'q-clarify', text: 'Мы заметили несоответствие между описанием и фото. Уточните, что именно произошло?', field: 'clarification' }
-        ],
-        urgencySignals
-      };
-    }
-
-    // Используем более уверенный результат
-    const useText = textResult.confidence >= visionResult.confidence;
-    const category = useText ? textResult.category : visionResult.category;
-    const subcategory = useText ? textResult.subcategory : visionResult.subcategory;
-    const confidence = (textResult.confidence + visionResult.confidence) / 2;
-    const severity = urgencySignals.length > 0 ? 'CRITICAL' : 
-                     (visionResult.visualSeverity || (useText ? 'MEDIUM' : 'MEDIUM'));
-
-    // Добавляем вопросы
-    if (!originalText.includes('подвал') && !originalText.includes('подъезд')) {
-      questions.push({
-        id: 'q-location',
-        text: 'Где именно находится проблема?',
-        field: 'location'
-      });
-    }
-
-    return {
-      classificationResult: questions.length > 0 ? 'NEEDS_CLARIFICATION' : 'KNOWN_INCIDENT',
-      category,
-      subcategory,
-      severity,
-      confidence,
-      recommendedWorkerType: category ? (WORKER_MAPPING[category] || 'DISPATCHER') : 'DISPATCHER',
-      recommendedQuestions: questions,
-      urgencySignals
-    };
+    return handleTextAndImage(textResult, visionResult, originalText, urgencySignals);
   }
 
   // Fallback: ничего не получено
@@ -245,5 +144,219 @@ function fuseResults(
     recommendedWorkerType: 'DISPATCHER',
     recommendedQuestions: [],
     urgencySignals
+  };
+}
+
+// ====== Обработка TEXT ONLY ======
+function handleTextOnly(
+  textResult: TextAnalysisResult,
+  originalText: string,
+  urgencySignals: string[]
+): AnalysisResult {
+  const questions: ClarificationQuestion[] = [];
+
+  // Если категория не определена (NOT_INCIDENT)
+  if (!textResult.category || textResult.confidence < 0.3) {
+    return {
+      classificationResult: 'NOT_INCIDENT',
+      category: null,
+      subcategory: null,
+      severity: 'LOW',
+      confidence: textResult.confidence,
+      recommendedWorkerType: 'DISPATCHER',
+      recommendedQuestions: [],
+      urgencySignals,
+      modelVersions: { text: textResult.modelVersion }
+    };
+  }
+
+  const severity = urgencySignals.length > 0 ? 'CRITICAL' : 'MEDIUM';
+  
+  // Добавляем вопросы для уточнения локации
+  if (!originalText.includes('подвал') && !originalText.includes('подъезд') && !originalText.includes('квартир')) {
+    questions.push({
+      id: 'q-location',
+      text: 'Где именно находится проблема? (подъезд, этаж, место)',
+      field: 'location'
+    });
+  }
+
+  return {
+    classificationResult: questions.length > 0 ? 'NEEDS_CLARIFICATION' : 'KNOWN_INCIDENT',
+    category: textResult.category,
+    subcategory: textResult.subcategory,
+    severity,
+    confidence: textResult.confidence,
+    recommendedWorkerType: WORKER_MAPPING[textResult.category] || 'DISPATCHER',
+    recommendedQuestions: questions,
+    urgencySignals,
+    fusionLevel: 'HIGH',
+    fusionReason: 'Только текст, уверенность высокая',
+    modelVersions: { text: textResult.modelVersion }
+  };
+}
+
+// ====== Обработка IMAGE ONLY ======
+function handleImageOnly(
+  visionResult: VisionAnalysisResult,
+  urgencySignals: string[]
+): AnalysisResult {
+  const questions: ClarificationQuestion[] = [];
+
+  // NOT_INCIDENT
+  if (visionResult.classificationResult === 'NOT_INCIDENT') {
+    return {
+      classificationResult: 'NOT_INCIDENT',
+      category: null,
+      subcategory: null,
+      severity: 'LOW',
+      confidence: visionResult.confidence,
+      recommendedWorkerType: 'DISPATCHER',
+      recommendedQuestions: [],
+      urgencySignals,
+      modelVersions: { cv: visionResult.modelVersion }
+    };
+  }
+
+  // NEEDS_CLARIFICATION (в top3 несколько кандидатов)
+  if (visionResult.classificationResult === 'NEEDS_CLARIFICATION') {
+    questions.push({
+      id: 'q-desc',
+      text: 'Опишите подробнее, что произошло?',
+      field: 'description'
+    });
+
+    return {
+      classificationResult: 'NEEDS_CLARIFICATION',
+      category: visionResult.category,
+      subcategory: null,
+      severity: visionResult.visualSeverity || 'MEDIUM',
+      confidence: visionResult.confidence,
+      recommendedWorkerType: visionResult.category ? (WORKER_MAPPING[visionResult.category] || 'DISPATCHER') : 'DISPATCHER',
+      recommendedQuestions: questions,
+      urgencySignals,
+      fusionLevel: 'LOW',
+      fusionReason: 'Только фото, несколько кандидатов в top3',
+      modelVersions: { cv: visionResult.modelVersion }
+    };
+  }
+
+  // KNOWN_INCIDENT
+  questions.push({
+    id: 'q-desc',
+    text: 'Опишите подробнее, что произошло?',
+    field: 'description'
+  });
+
+  return {
+    classificationResult: 'NEEDS_CLARIFICATION',
+    category: visionResult.category,
+    subcategory: null,
+    severity: visionResult.visualSeverity || 'MEDIUM',
+    confidence: visionResult.confidence,
+    recommendedWorkerType: visionResult.category ? (WORKER_MAPPING[visionResult.category] || 'DISPATCHER') : 'DISPATCHER',
+    recommendedQuestions: questions,
+    urgencySignals,
+    fusionLevel: 'MEDIUM',
+    fusionReason: 'Только фото, нужна текстовая информация',
+    modelVersions: { cv: visionResult.modelVersion }
+  };
+}
+
+// ====== Обработка TEXT + IMAGE (Fusion по top3) ======
+function handleTextAndImage(
+  textResult: TextAnalysisResult,
+  visionResult: VisionAnalysisResult,
+  originalText: string,
+  urgencySignals: string[]
+): AnalysisResult {
+  const questions: ClarificationQuestion[] = [];
+
+  // Извлекаем категории из top3
+  const cvCat = visionResult.category;
+  const txCat = textResult.category;
+  const cvCats = visionResult.top3?.map(x => x.category).filter(c => c !== null) || [];
+  const txCats = textResult.top3?.map(x => x.category).filter(c => c !== null) || [];
+
+  let finalCategory: string | null = null;
+  let fusionLevel: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
+  let fusionReason = '';
+  let needsReview = false;
+
+  // Правило 1: HIGH — category фото == category текста
+  if (cvCat && txCat && cvCat === txCat) {
+    finalCategory = txCat;
+    fusionLevel = 'HIGH';
+    fusionReason = 'CV и текст согласны (top-1)';
+  }
+  // Правило 2: MEDIUM — category текста встречается в top3 фото
+  else if (txCat && cvCats.includes(txCat)) {
+    finalCategory = txCat;
+    fusionLevel = 'MEDIUM';
+    fusionReason = 'Категория текста в top3 фото';
+    needsReview = true;
+  }
+  // Правило 3: MEDIUM — category фото встречается в top3 текста
+  else if (cvCat && txCats.includes(cvCat)) {
+    finalCategory = cvCat;
+    fusionLevel = 'MEDIUM';
+    fusionReason = 'Категория фото в top3 текста';
+    needsReview = true;
+  }
+  // Правило 4: LOW — нет пересечений
+  else {
+    fusionLevel = 'LOW';
+    fusionReason = 'Нет пересечения, нужно уточнение';
+  }
+
+  // Если категория не определена
+  if (!finalCategory) {
+    questions.push({
+      id: 'q-clarify',
+      text: 'Не удалось однозначно определить тип проблемы. Уточните, что именно произошло?',
+      field: 'clarification'
+    });
+
+    return {
+      classificationResult: 'NEEDS_CLARIFICATION',
+      category: null,
+      subcategory: null,
+      severity: 'MEDIUM',
+      confidence: Math.max(textResult.confidence, visionResult.confidence) * 0.7,
+      recommendedWorkerType: 'DISPATCHER',
+      recommendedQuestions: questions,
+      urgencySignals,
+      fusionLevel,
+      fusionReason,
+      needsReview,
+      modelVersions: { cv: visionResult.modelVersion, text: textResult.modelVersion }
+    };
+  }
+
+  // Определяем срочность
+  const severity = urgencySignals.length > 0 ? 'CRITICAL' : 'MEDIUM';
+
+  // Добавляем вопросы для уточнения локации
+  if (!originalText.includes('подвал') && !originalText.includes('подъезд') && !originalText.includes('квартир')) {
+    questions.push({
+      id: 'q-location',
+      text: 'Где именно находится проблема?',
+      field: 'location'
+    });
+  }
+
+  return {
+    classificationResult: questions.length > 0 ? 'NEEDS_CLARIFICATION' : 'KNOWN_INCIDENT',
+    category: finalCategory,
+    subcategory: textResult.subcategory, // Используем подкатегорию из текста
+    severity,
+    confidence: (textResult.confidence + visionResult.confidence) / 2,
+    recommendedWorkerType: WORKER_MAPPING[finalCategory] || 'DISPATCHER',
+    recommendedQuestions: questions,
+    urgencySignals,
+    fusionLevel,
+    fusionReason,
+    needsReview,
+    modelVersions: { cv: visionResult.modelVersion, text: textResult.modelVersion }
   };
 }
