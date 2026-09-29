@@ -168,6 +168,8 @@ export function ResidentChat({ store }: Props) {
     setImagePreview(null);
     setShowDemoMode(false);
     setSelectedImageType('');
+    store.setClarificationStep(0);
+    setIncidentDraft({ answers: {} });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -323,6 +325,7 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
     
     store.createIncident(incident);
     store.setPendingFusion(null);
+    store.setClarificationStep(0);
     setIncidentDraft({ answers: {} });
     
     store.addMessage({
@@ -409,8 +412,7 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
 
   const showConfirmButtons = store.pendingFusion && 
     store.pendingFusion.classificationResult !== 'NOT_INCIDENT' && 
-    store.clarificationStep >= store.pendingFusion.recommendedQuestions.length &&
-    !store.currentIncident;
+    store.clarificationStep >= store.pendingFusion.recommendedQuestions.length;
 
   const hasAttachment = selectedFile || (showDemoMode && selectedImageType);
 
@@ -518,6 +520,8 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
             <button
               onClick={() => {
                 store.setPendingFusion(null);
+                store.setClarificationStep(0);
+                setIncidentDraft({ answers: {} });
                 store.addMessage({
                   role: 'ai',
                   content: 'Заявка отменена. Опишите проблему иначе.'
