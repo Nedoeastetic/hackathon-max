@@ -138,8 +138,25 @@ export function ResidentChat({ store }: Props) {
         const textResult = text ? await analyzeText(text) : null;
         
         // Для демо-режима используем симуляцию
-        // Для реального файла - тоже симуляция (в продакшене здесь будет загрузка на сервер)
-        const imageDesc = hasDemoImage ? selectedImageType : (hasFile ? 'загруженное фото' : undefined);
+        // Для реального файла — в прототипе симуляция, в реальном боте — ML API
+        let imageDesc = hasDemoImage ? selectedImageType : undefined;
+        
+        // Если загружен реальный файл, но нет текста — просим уточнить тип проблемы
+        if (hasFile && !text && !hasDemoImage) {
+          store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
+          store.addMessage({
+            role: 'ai',
+            content: '📷 Фото получено! В демо-версии прототипа реальные фото не анализируются ML-моделью.\n\nЧтобы продолжить, выберите тип проблемы или опишите её текстом.\n\n💡 В реальном боте MAX фото анализируется автоматически через ML API.'
+          });
+          store.setIsProcessing(false);
+          return;
+        }
+        
+        // Если есть и файл, и текст — используем текст для анализа
+        if (hasFile && text) {
+          imageDesc = undefined; // используем только текст
+        }
+        
         const visionResult = imageDesc ? await analyzeImage(imageDesc) : null;
         
         const fusion = fuseResults(textResult, visionResult, inputMode);

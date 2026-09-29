@@ -77,7 +77,8 @@ const CATEGORY_KEYWORDS: Record<string, { words: string[]; subcategory: string }
   ELECTRICITY: [
     { words: ['нет света', 'не горит', 'лампочк', 'освещен', 'темно', 'электричеств'], subcategory: 'NO_LIGHT_STAIRWELL' },
     { words: ['провод', 'оголён', 'обнаж', 'искр'], subcategory: 'EXPOSED_WIRES' },
-    { words: ['щиток', 'автомат', 'пробк'], subcategory: 'ELECTRICAL_PANEL' }
+    { words: ['щиток', 'автомат', 'пробк'], subcategory: 'ELECTRICAL_PANEL' },
+    { words: ['газ', 'пахнет газ'], subcategory: 'EXPOSED_WIRES' } // Газ — критическая ситуация
   ],
   HEATING: [
     { words: ['нет отоплен', 'холодн.*батаре', 'не греет', 'батареи холодн'], subcategory: 'NO_HEATING' },
