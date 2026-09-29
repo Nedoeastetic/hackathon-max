@@ -65,61 +65,6 @@ export interface FusionResult {
   needsReview?: boolean;
 }
 
-// ====== Реальный ML API через прокси ======
-
-const PROXY_URL = 'http://localhost:3001';
-
-export async function analyzeImageReal(file: File): Promise<VisionAnalysisResult> {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch(`${PROXY_URL}/api/vision/analyze`, {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      throw new Error(`Vision API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Real vision analysis failed:', error);
-    throw error;
-  }
-}
-
-export async function analyzeTextReal(text: string): Promise<TextAnalysisResult> {
-  try {
-    const response = await fetch(`${PROXY_URL}/api/text/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Text API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Real text analysis failed:', error);
-    throw error;
-  }
-}
-
-export async function checkMLHealth(): Promise<boolean> {
-  try {
-    const response = await fetch(`${PROXY_URL}/api/health`);
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
 // ====== Симуляция Text Analysis ======
 
 const CATEGORY_KEYWORDS: Record<string, { words: string[]; subcategory: string }[]> = {
