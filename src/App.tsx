@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, Layout, FlaskConical, Plug } from 'lucide-react';
+import { Home, Layout, FlaskConical, Plug, Users } from 'lucide-react';
 import { useAppStore } from './store/useStore';
 import { RoleSelector } from './components/RoleSelector';
 import { ResidentView } from './components/ResidentView';
@@ -34,6 +34,7 @@ function App() {
 
   // Навигация для остальных вкладок
   const tabs = [
+    { key: 'role-select' as const, label: 'Роли', icon: Users },
     { key: 'overview' as const, label: 'Главная', icon: Home },
     { key: 'architecture' as const, label: 'Архитектура', icon: Layout },
     { key: 'tests' as const, label: 'Тесты', icon: FlaskConical },
