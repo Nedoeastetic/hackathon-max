@@ -1,6 +1,20 @@
 // Устанавливаем переменную окружения ДО всех импортов для отключения SSL проверки
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+// Подавляем предупреждение о NODE_TLS_REJECT_UNAUTHORIZED
+const originalEmit = process.emit;
+process.emit = function (name: string, data: any, ...args: any[]) {
+  if (
+    name === 'warning' &&
+    data?.name === 'UnsupportedWarning' &&
+    typeof data?.message === 'string' &&
+    data.message.includes('NODE_TLS_REJECT_UNAUTHORIZED')
+  ) {
+    return false;
+  }
+  return originalEmit.apply(process, [name, data, ...args] as any);
+};
+
 import 'dotenv/config';
 import { analyzeInput, AnalysisResult } from './ai/classifier.js';
 import { checkHealth } from './ai/api-client.js';
@@ -34,8 +48,10 @@ if (TOKEN !== TOKEN.trim()) {
   process.exit(1);
 }
 
+console.log('🔧 Создаём бота с токеном...');
 const bot = new Bot(TOKEN);
 const store = new IncidentStore();
+console.log('✅ Бот создан');
 
 // Сессии пользователей
 interface Session {
@@ -385,11 +401,25 @@ async function main() {
   
   console.log('');
   console.log('📡 Режим: Long Polling');
+  console.log('🔑 Токен: ' + TOKEN.substring(0, 10) + '...');
   console.log('');
   
-  await bot.start();
-  console.log('✅ Бот запущен и готов принимать сообщения!');
-  console.log('   Нажмите Ctrl+C для остановки');
+  try {
+    console.log('⏳ Подключение к MAX API...');
+    await bot.start();
+    console.log('✅ Бот запущен и готов принимать сообщения!');
+    console.log('   Нажмите Ctrl+C для остановки');
+  } catch (error) {
+    console.error('❌ Ошибка запуска бота:', error);
+    console.error('');
+    console.error('Возможные причины:');
+    console.error('1. Неверный токен бота');
+    console.error('2. Проблемы с интернет-соединением');
+    console.error('3. Серверы MAX недоступны');
+    console.error('');
+    console.error('Проверьте файл .env и убедитесь, что токен правильный.');
+    process.exit(1);
+  }
 }
 
 // Обработка ошибок
