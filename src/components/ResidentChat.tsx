@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Camera, Loader2, CheckCircle, X } from 'lucide-react';
 import { AppStore } from '../store/useStore';
-import { analyzeText, analyzeImage, fuseResults, FusionResult } from '../data/aiEngine';
+import { analyzeText, analyzeImage, analyzeTextReal, analyzeImageReal, checkMLHealth, fuseResults, FusionResult } from '../data/aiEngine';
 import { getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
 import { Incident, InputMode } from '../types';
 import { mockBuildings } from '../data/mockData';
@@ -135,29 +135,41 @@ export function ResidentChat({ store }: Props) {
       });
       
       try {
-        const textResult = text ? await analyzeText(text) : null;
+        // Проверяем доступность прокси-сервера
+        const proxyAvailable = await checkMLHealth();
         
-        // Для демо-режима используем симуляцию
-        // Для реального файла — в прототипе симуляция, в реальном боте — ML API
-        let imageDesc = hasDemoImage ? selectedImageType : undefined;
+        let textResult = null;
+        let visionResult = null;
         
-        // Если загружен реальный файл, но нет текста — просим уточнить тип проблемы
-        if (hasFile && !text && !hasDemoImage) {
-          store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
-          store.addMessage({
-            role: 'ai',
-            content: '📷 Фото получено! В демо-версии прототипа реальные фото не анализируются ML-моделью.\n\nЧтобы продолжить, выберите тип проблемы или опишите её текстом.\n\n💡 В реальном боте MAX фото анализируется автоматически через ML API.'
-          });
-          store.setIsProcessing(false);
-          return;
+        if (proxyAvailable) {
+          // Используем реальный ML API через прокси
+          if (text) {
+            textResult = await analyzeTextReal(text);
+          }
+          
+          if (hasFile && selectedFile) {
+            visionResult = await analyzeImageReal(selectedFile);
+          } else if (hasDemoImage) {
+            // Для демо-режима используем симуляцию
+            visionResult = await analyzeImage(selectedImageType);
+          }
+        } else {
+          // Fallback на симуляцию
+          textResult = text ? await analyzeText(text) : null;
+          
+          if (hasFile && !text && !hasDemoImage) {
+            store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
+            store.addMessage({
+              role: 'ai',
+              content: '📷 Фото получено! Прокси-сервер недоступен.\n\nЗапустите прокси-сервер командой:\n```\nnode proxy-server.js\n```\n\nИли опишите проблему текстом.'
+            });
+            store.setIsProcessing(false);
+            return;
+          }
+          
+          const imageDesc = hasDemoImage ? selectedImageType : undefined;
+          visionResult = imageDesc ? await analyzeImage(imageDesc) : null;
         }
-        
-        // Если есть и файл, и текст — используем текст для анализа
-        if (hasFile && text) {
-          imageDesc = undefined; // используем только текст
-        }
-        
-        const visionResult = imageDesc ? await analyzeImage(imageDesc) : null;
         
         const fusion = fuseResults(textResult, visionResult, inputMode);
         

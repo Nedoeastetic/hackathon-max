@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "proxy": "node proxy-server.js",
+    "dev:full": "npm run proxy & npm run dev"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
@@ -13,11 +15,19 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@maxhub/max-bot-api": "^0.3.1",
     "@supabase/supabase-js": "^2.98.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
     "canvas-confetti": "^1.9.3",
+    "cors": "^2.8.6",
     "date-fns": "^2.30.0",
     "dotenv": "^18.0.4",
+    "express": "^5.2.1",
+    "form-data": "^4.0.6",
     "framer-motion": "^11.16.1",
     "lucide-react": "^0.294.0",
+    "multer": "^2.4.0",
+    "node-fetch": "^2.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.0",
