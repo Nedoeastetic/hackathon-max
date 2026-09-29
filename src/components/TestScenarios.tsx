@@ -11,32 +11,26 @@ interface TestCase {
   imageType?: string;
   expectedResult: string;
   expectedCategory?: string;
-  expectedSeverity?: string;
 }
 
 const testCases: TestCase[] = [
-  // Text only
-  { id: 't1', name: 'Течёт труба в подвале', mode: 'TEXT_ONLY', text: 'В подвале течёт труба, уже вся вода на полу', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'WATER_SUPPLY', expectedSeverity: 'HIGH' },
-  { id: 't2', name: 'Грязный подъезд', mode: 'TEXT_ONLY', text: 'В подъезде очень грязно, давно не мыли', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'CLEANING', expectedSeverity: 'LOW' },
-  { id: 't3', name: 'Упало дерево', mode: 'TEXT_ONLY', text: 'Во дворе упало дерево и перекрыло проход', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'YARD', expectedSeverity: 'HIGH' },
-  { id: 't4', name: 'Нет света', mode: 'TEXT_ONLY', text: 'Не работает свет на лестнице, 2 этаж', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'ELECTRICITY', expectedSeverity: 'MEDIUM' },
-  { id: 't5', name: 'Сломана дверь', mode: 'TEXT_ONLY', text: 'Дверь подъезда сломана, не закрывается', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'DOOR', expectedSeverity: 'MEDIUM' },
-  { id: 't6', name: 'Нерелевантный текст', mode: 'TEXT_ONLY', text: 'Привет, как дела?', expectedResult: 'NOT_INCIDENT' },
+  { id: 't1', name: 'Течёт труба', mode: 'TEXT_ONLY', text: 'В подвале течёт труба, уже вся вода на полу', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'WATER_SUPPLY' },
+  { id: 't2', name: 'Грязный подъезд', mode: 'TEXT_ONLY', text: 'В подъезде очень грязно, давно не мыли', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'CLEANING' },
+  { id: 't3', name: 'Упало дерево', mode: 'TEXT_ONLY', text: 'Во дворе упало дерево и перекрыло проход', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'YARD' },
+  { id: 't4', name: 'Нет света', mode: 'TEXT_ONLY', text: 'Не работает свет на лестнице, 2 этаж', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'ELECTRICITY' },
+  { id: 't5', name: 'Сломана дверь', mode: 'TEXT_ONLY', text: 'Дверь подъезда сломана, не закрывается', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'DOOR' },
+  { id: 't6', name: 'Нерелевантный', mode: 'TEXT_ONLY', text: 'Привет, как дела?', expectedResult: 'NOT_INCIDENT' },
   { id: 't7', name: 'Пустой текст', mode: 'TEXT_ONLY', text: '', expectedResult: 'NOT_INCIDENT' },
-  { id: 't8', name: 'Газ (критично)', mode: 'TEXT_ONLY', text: 'Пахнет газом в подъезде!', expectedResult: 'KNOWN_INCIDENT', expectedSeverity: 'CRITICAL' },
-  
-  // Image only
+  { id: 't8', name: 'Газ (критично)', mode: 'TEXT_ONLY', text: 'Пахнет газом в подъезде!', expectedResult: 'KNOWN_INCIDENT' },
   { id: 'i1', name: 'Фото протечки', mode: 'IMAGE_ONLY', imageType: 'протечка', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'WATER_SUPPLY' },
   { id: 'i2', name: 'Фото грязи', mode: 'IMAGE_ONLY', imageType: 'грязь', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'CLEANING' },
   { id: 'i3', name: 'Фото дерева', mode: 'IMAGE_ONLY', imageType: 'дерево упало', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'YARD' },
   { id: 'i4', name: 'Фото двери', mode: 'IMAGE_ONLY', imageType: 'дверь сломана', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'DOOR' },
   { id: 'i5', name: 'Фото кота', mode: 'IMAGE_ONLY', imageType: 'кот', expectedResult: 'NOT_INCIDENT' },
-  { id: 'i6', name: 'Неизвестное повреждение', mode: 'IMAGE_ONLY', imageType: 'повреждение неизвестное', expectedResult: 'OTHER_INCIDENT' },
-  
-  // Text + Image
-  { id: 'ti1', name: 'Текст + фото согласуются', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба', imageType: 'протечка', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'WATER_SUPPLY' },
-  { id: 'ti2', name: 'Текст + фото противоречат', mode: 'TEXT_AND_IMAGE', text: 'Упало дерево', imageType: 'протечка', expectedResult: 'CONFLICT' },
-  { id: 'ti3', name: 'Текст + нерелевантное фото', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба в подвале', imageType: 'кот', expectedResult: 'CONFLICT' },
+  { id: 'i6', name: 'Неизвестное', mode: 'IMAGE_ONLY', imageType: 'повреждение неизвестное', expectedResult: 'OTHER_INCIDENT' },
+  { id: 'ti1', name: 'Текст + фото', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба', imageType: 'протечка', expectedResult: 'KNOWN_INCIDENT', expectedCategory: 'WATER_SUPPLY' },
+  { id: 'ti2', name: 'Противоречие', mode: 'TEXT_AND_IMAGE', text: 'Упало дерево', imageType: 'протечка', expectedResult: 'CONFLICT' },
+  { id: 'ti3', name: 'Нерелевантное фото', mode: 'TEXT_AND_IMAGE', text: 'Течёт труба в подвале', imageType: 'кот', expectedResult: 'CONFLICT' },
 ];
 
 export function TestScenarios() {
@@ -84,69 +78,78 @@ export function TestScenarios() {
   const totalCount = Object.keys(results).length;
 
   return (
-    <div className="p-6 overflow-y-auto h-full bg-gray-50">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Тестовые сценарии</h2>
-          <p className="text-sm text-gray-600">Автоматическая проверка AI-классификации</p>
+    <div className="p-4 overflow-y-auto h-full space-y-3" style={{ background: 'var(--max-surface)' }}>
+      <div className="max-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--max-text-primary)' }}>Тестовые сценарии</h2>
+            <p className="text-xs" style={{ color: 'var(--max-text-secondary)' }}>Проверка AI-классификации</p>
+          </div>
+          <button
+            onClick={runAll}
+            disabled={running}
+            className="max-btn max-btn-primary text-xs"
+          >
+            <Play className="w-3 h-3" />
+            {running ? 'Выполняется...' : 'Запустить все'}
+          </button>
         </div>
-        <button
-          onClick={runAll}
-          disabled={running}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
-        >
-          <Play className="w-4 h-4" />
-          {running ? 'Выполняется...' : 'Запустить все'}
-        </button>
+        
+        {totalCount > 0 && (
+          <div className="flex items-center gap-3 p-2.5 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+            <CheckCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--max-success)' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--max-text-primary)' }}>
+              {passedCount}/{totalCount}
+            </span>
+            <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--max-border)' }}>
+              <div 
+                className="h-1.5 rounded-full transition-all"
+                style={{ 
+                  width: `${(passedCount / totalCount) * 100}%`,
+                  background: 'var(--max-success)' 
+                }}
+              />
+            </div>
+            <span className="text-xs font-medium" style={{ color: 'var(--max-text-secondary)' }}>
+              {Math.round((passedCount / totalCount) * 100)}%
+            </span>
+          </div>
+        )}
       </div>
       
-      {/* Summary */}
-      {totalCount > 0 && (
-        <div className="bg-white rounded-xl border p-4 mb-4 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span className="text-sm font-medium">Пройдено: {passedCount}/{totalCount}</span>
-          </div>
-          <div className="flex-1 bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-green-500 h-2 rounded-full transition-all"
-              style={{ width: `${(passedCount / totalCount) * 100}%` }}
-            />
-          </div>
-          <span className="text-sm text-gray-500">{Math.round((passedCount / totalCount) * 100)}%</span>
+      {/* Text only */}
+      <div className="max-card p-3">
+        <h3 className="text-xs font-semibold mb-2 px-1" style={{ color: 'var(--max-text-secondary)' }}>
+          📝 TEXT ONLY
+        </h3>
+        <div className="space-y-1.5">
+          {testCases.filter(t => t.mode === 'TEXT_ONLY').map(tc => (
+            <TestRow key={tc.id} tc={tc} result={results[tc.id]} running={currentTest === tc.id} onRun={() => runTest(tc)} />
+          ))}
         </div>
-      )}
+      </div>
       
-      {/* Test groups */}
-      <div className="space-y-6">
-        {/* Text only */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3 text-sm">📝 TEXT ONLY</h3>
-          <div className="space-y-2">
-            {testCases.filter(t => t.mode === 'TEXT_ONLY').map(tc => (
-              <TestRow key={tc.id} tc={tc} result={results[tc.id]} running={currentTest === tc.id} onRun={() => runTest(tc)} />
-            ))}
-          </div>
+      {/* Image only */}
+      <div className="max-card p-3">
+        <h3 className="text-xs font-semibold mb-2 px-1" style={{ color: 'var(--max-text-secondary)' }}>
+          📷 IMAGE ONLY
+        </h3>
+        <div className="space-y-1.5">
+          {testCases.filter(t => t.mode === 'IMAGE_ONLY').map(tc => (
+            <TestRow key={tc.id} tc={tc} result={results[tc.id]} running={currentTest === tc.id} onRun={() => runTest(tc)} />
+          ))}
         </div>
-        
-        {/* Image only */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3 text-sm">📷 IMAGE ONLY</h3>
-          <div className="space-y-2">
-            {testCases.filter(t => t.mode === 'IMAGE_ONLY').map(tc => (
-              <TestRow key={tc.id} tc={tc} result={results[tc.id]} running={currentTest === tc.id} onRun={() => runTest(tc)} />
-            ))}
-          </div>
-        </div>
-        
-        {/* Text + Image */}
-        <div>
-          <h3 className="font-semibold text-gray-900 mb-3 text-sm">📝📷 TEXT + IMAGE</h3>
-          <div className="space-y-2">
-            {testCases.filter(t => t.mode === 'TEXT_AND_IMAGE').map(tc => (
-              <TestRow key={tc.id} tc={tc} result={results[tc.id]} running={currentTest === tc.id} onRun={() => runTest(tc)} />
-            ))}
-          </div>
+      </div>
+      
+      {/* Text + Image */}
+      <div className="max-card p-3">
+        <h3 className="text-xs font-semibold mb-2 px-1" style={{ color: 'var(--max-text-secondary)' }}>
+          📝📷 TEXT + IMAGE
+        </h3>
+        <div className="space-y-1.5">
+          {testCases.filter(t => t.mode === 'TEXT_AND_IMAGE').map(tc => (
+            <TestRow key={tc.id} tc={tc} result={results[tc.id]} running={currentTest === tc.id} onRun={() => runTest(tc)} />
+          ))}
         </div>
       </div>
     </div>
@@ -155,45 +158,51 @@ export function TestScenarios() {
 
 function TestRow({ tc, result, running, onRun }: { tc: TestCase; result?: { result: FusionResult | null; passed: boolean }; running: boolean; onRun: () => void }) {
   return (
-    <div className="bg-white rounded-lg border p-3 flex items-center gap-3">
+    <div 
+      className="flex items-center gap-2 p-2 rounded-xl transition-all"
+      style={{ background: 'var(--max-surface)' }}
+    >
       <button
         onClick={onRun}
         disabled={running}
-        className="bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 rounded-full w-7 h-7 flex items-center justify-center transition-colors shrink-0"
+        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all"
+        style={{ 
+          background: running ? 'var(--max-primary-light)' : 'var(--max-background)',
+          border: `1px solid ${running ? 'var(--max-primary)' : 'var(--max-border)'}`
+        }}
       >
-        {running ? <Clock className="w-3 h-3 text-blue-600 animate-spin" /> : <Play className="w-3 h-3 text-gray-600" />}
+        {running ? <Clock className="w-3 h-3 animate-spin" style={{ color: 'var(--max-primary)' }} /> : <Play className="w-3 h-3" style={{ color: 'var(--max-text-secondary)' }} />}
       </button>
       
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{tc.name}</p>
-        <p className="text-xs text-gray-500 truncate">
+        <p className="text-xs font-medium truncate" style={{ color: 'var(--max-text-primary)' }}>{tc.name}</p>
+        <p className="text-[10px] truncate" style={{ color: 'var(--max-text-tertiary)' }}>
           {tc.text && `«${tc.text}»`}
-          {tc.imageType && ` [${tc.imageType}]`}
+          {tc.imageType && `[${tc.imageType}]`}
         </p>
       </div>
       
-      <div className="text-xs text-gray-500 shrink-0">
-        Ожидание: <span className="font-mono font-medium">{tc.expectedResult}</span>
-        {tc.expectedCategory && <span className="text-gray-400"> / {tc.expectedCategory}</span>}
-      </div>
-      
       {result && (
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-xs font-mono px-2 py-0.5 rounded ${
-            result.result?.classificationResult === tc.expectedResult ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-          }`}>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span 
+            className="text-[10px] font-mono px-1.5 py-0.5 rounded-lg"
+            style={{ 
+              background: result.result?.classificationResult === tc.expectedResult ? '#E6F9E6' : '#FFE6E6',
+              color: result.result?.classificationResult === tc.expectedResult ? 'var(--max-success)' : 'var(--max-error)'
+            }}
+          >
             {result.result?.classificationResult || 'ERROR'}
           </span>
           {result.passed ? (
-            <CheckCircle className="w-4 h-4 text-green-600" />
+            <CheckCircle className="w-3.5 h-3.5" style={{ color: 'var(--max-success)' }} />
           ) : (
-            <XCircle className="w-4 h-4 text-red-600" />
+            <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--max-error)' }} />
           )}
         </div>
       )}
       
       {!result && !running && (
-        <span className="text-xs text-gray-400 shrink-0">Не запущен</span>
+        <span className="text-[10px] shrink-0" style={{ color: 'var(--max-text-tertiary)' }}>—</span>
       )}
     </div>
   );

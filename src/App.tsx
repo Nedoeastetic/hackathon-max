@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, MessageCircle, Wrench, Layout, FlaskConical, Plug } from 'lucide-react';
+import { Home, MessageCircle, Wrench, Layout, FlaskConical, Plug, ArrowLeft } from 'lucide-react';
 import { useAppStore } from './store/useStore';
 import { ResidentChat } from './components/ResidentChat';
 import { MasterDashboard } from './components/MasterDashboard';
@@ -15,91 +15,99 @@ function App() {
   const store = useAppStore();
 
   const tabs = [
-    { key: 'overview' as Tab, label: 'Обзор', icon: Home },
+    { key: 'overview' as Tab, label: 'Главная', icon: Home },
     { key: 'resident' as Tab, label: 'Житель', icon: MessageCircle },
     { key: 'master' as Tab, label: 'Мастер', icon: Wrench },
     { key: 'architecture' as Tab, label: 'Архитектура', icon: Layout },
     { key: 'tests' as Tab, label: 'Тесты', icon: FlaskConical },
-    { key: 'integration' as Tab, label: 'MAX', icon: Plug }
+    { key: 'integration' as Tab, label: 'MAX API', icon: Plug }
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
-      {/* Top navigation */}
-      <header className="bg-white border-b shadow-sm shrink-0">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between h-14">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--max-surface)' }}>
+      {/* MAX-style Header */}
+      <header 
+        className="shrink-0 border-b"
+        style={{ 
+          background: 'var(--max-background)', 
+          borderColor: 'var(--max-border)',
+          boxShadow: 'var(--max-shadow-sm)'
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="flex items-center h-14">
+            {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <div 
+                className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                style={{ background: 'var(--max-primary)' }}
+              >
                 <span className="text-white text-sm font-bold">АД</span>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-sm font-bold text-gray-900">Аварийный диспетчер МКД</h1>
-                <p className="text-xs text-gray-500">MAX • Хакатон «Умный город»</p>
+                <h1 
+                  className="text-base font-semibold leading-tight"
+                  style={{ color: 'var(--max-text-primary)' }}
+                >
+                  Аварийный диспетчер
+                </h1>
+                <p 
+                  className="text-xs leading-tight"
+                  style={{ color: 'var(--max-text-secondary)' }}
+                >
+                  MAX • Умный город
+                </p>
               </div>
             </div>
             
             {/* Desktop tabs */}
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-1 ml-6">
               {tabs.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab.key 
-                      ? 'bg-blue-50 text-blue-700' 
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                  style={{
+                    background: activeTab === tab.key ? 'var(--max-primary-light)' : 'transparent',
+                    color: activeTab === tab.key ? 'var(--max-primary)' : 'var(--max-text-secondary)',
+                  }}
                 >
                   <tab.icon className="w-4 h-4" />
-                  {tab.label}
+                  <span className="hidden xl:inline">{tab.label}</span>
                 </button>
               ))}
             </nav>
             
             {/* Status */}
-            <div className="hidden lg:flex items-center gap-2 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                MVP Demo
-              </span>
+            <div className="hidden lg:flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: '#E6F9E6' }}>
+                <span 
+                  className="w-1.5 h-1.5 rounded-full animate-pulse"
+                  style={{ background: 'var(--max-success)' }}
+                />
+                <span className="text-xs font-medium" style={{ color: 'var(--max-success)' }}>
+                  Онлайн
+                </span>
+              </div>
             </div>
           </div>
-          
-          {/* Tablet tabs */}
-          <nav className="lg:hidden flex items-center gap-1 overflow-x-auto pb-2 -mx-4 px-4">
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                  activeTab === tab.key 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
         </div>
       </header>
       
       {/* Main content */}
       <main className="flex-1 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto">
+        <div className="h-full max-w-5xl mx-auto">
           {activeTab === 'overview' && <OverviewPage />}
           {activeTab === 'resident' && (
             <div className="h-full flex">
-              <div className="flex-1 max-w-lg mx-auto w-full border-x bg-white">
+              <div className="flex-1 max-w-md mx-auto w-full">
                 <ResidentChat store={store} />
               </div>
             </div>
           )}
           {activeTab === 'master' && (
             <div className="h-full flex">
-              <div className="flex-1 max-w-2xl mx-auto w-full border-x bg-white">
+              <div className="flex-1 max-w-xl mx-auto w-full">
                 <MasterDashboard store={store} />
               </div>
             </div>
@@ -110,20 +118,28 @@ function App() {
         </div>
       </main>
       
-      {/* Mobile bottom nav */}
-      <nav className="lg:hidden bg-white border-t flex shrink-0">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-xs transition-colors ${
-              activeTab === tab.key ? 'text-blue-600' : 'text-gray-500'
-            }`}
-          >
-            <tab.icon className="w-5 h-5" />
-            <span className="text-[10px]">{tab.label}</span>
-          </button>
-        ))}
+      {/* Mobile bottom nav - MAX style */}
+      <nav 
+        className="lg:hidden shrink-0 border-t flex"
+        style={{ 
+          background: 'var(--max-background)', 
+          borderColor: 'var(--max-border)' 
+        }}
+      >
+        {tabs.map(tab => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className="flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors"
+              style={{ color: isActive ? 'var(--max-primary)' : 'var(--max-text-secondary)' }}
+            >
+              <tab.icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium">{tab.label}</span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );

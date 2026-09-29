@@ -1,13 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Loader2, CheckCircle } from 'lucide-react';
+import { Send, Camera, Loader2, CheckCircle, Paperclip } from 'lucide-react';
 import { AppStore } from '../store/useStore';
 import { analyzeText, analyzeImage, fuseResults } from '../data/aiEngine';
 import { getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
 import { Incident, FusionResult, InputMode } from '../types';
 import { mockBuildings } from '../data/mockData';
-
-// Track which incidents we've already notified about
-const notifiedIncidents = new Set<string>();
 
 interface Props {
   store: AppStore;
@@ -29,29 +26,31 @@ export function ResidentChat({ store }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [store.messages]);
 
-  // Notify user when master takes their incident
+  // Уведомления о статусе
+  const notifiedIncidents = useRef(new Set<string>());
+  
   useEffect(() => {
     const userIncidents = store.incidents.filter(i => i.userId === 'resident-demo');
     for (const inc of userIncidents) {
-      if (inc.status === 'ASSIGNED' && !notifiedIncidents.has(inc.id + '-assigned')) {
-        notifiedIncidents.add(inc.id + '-assigned');
+      if (inc.status === 'ASSIGNED' && !notifiedIncidents.current.has(inc.id + '-assigned')) {
+        notifiedIncidents.current.add(inc.id + '-assigned');
         store.addMessage({
           role: 'ai',
-          content: `🔔 Мастер ${inc.assignedWorkerName} взял вашу заявку #${inc.id} в работу!\n\nКатегория: ${getCategoryById(inc.category || '')?.name || ''}\nОжидайте выполнения.`
+          content: `🔔 Мастер ${inc.assignedWorkerName} взял вашу заявку #${inc.id} в работу!`
         });
       }
-      if (inc.status === 'IN_PROGRESS' && !notifiedIncidents.has(inc.id + '-progress')) {
-        notifiedIncidents.add(inc.id + '-progress');
+      if (inc.status === 'IN_PROGRESS' && !notifiedIncidents.current.has(inc.id + '-progress')) {
+        notifiedIncidents.current.add(inc.id + '-progress');
         store.addMessage({
           role: 'ai',
-          content: `🔧 Мастер ${inc.assignedWorkerName} приступил к работе над заявкой #${inc.id}.`
+          content: `🔧 Мастер ${inc.assignedWorkerName} приступил к работе.`
         });
       }
-      if (inc.status === 'RESOLVED' && !notifiedIncidents.has(inc.id + '-resolved')) {
-        notifiedIncidents.add(inc.id + '-resolved');
+      if (inc.status === 'RESOLVED' && !notifiedIncidents.current.has(inc.id + '-resolved')) {
+        notifiedIncidents.current.add(inc.id + '-resolved');
         store.addMessage({
           role: 'ai',
-          content: `✅ Заявка #${inc.id} выполнена!\n\nМастер ${inc.assignedWorkerName} устранил проблему.\n\nСпасибо за обращение!`
+          content: `✅ Заявка #${inc.id} выполнена! Спасибо за обращение.`
         });
       }
     }
@@ -77,7 +76,7 @@ export function ResidentChat({ store }: Props) {
     setTimeout(async () => {
       store.addMessage({
         role: 'ai',
-        content: '⏳ Анализирую ваше обращение...'
+        content: '⏳ Анализирую...'
       });
       
       try {
@@ -85,12 +84,12 @@ export function ResidentChat({ store }: Props) {
         const visionResult = hasImage ? await analyzeImage(selectedImageType) : null;
         const fusion = fuseResults(textResult, visionResult, inputMode);
         
-        store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую ваше обращение...'));
+        store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
         
         if (fusion.classificationResult === 'NOT_INCIDENT') {
           store.addMessage({
             role: 'ai',
-            content: '🔍 На фотографии не удалось обнаружить проблему, связанную с содержанием дома.\n\nПопробуйте отправить фотографию повреждения или кратко опишите проблему текстом.'
+            content: '🔍 На фото не удалось обнаружить проблему, связанную с домом.\n\nПопробуйте отправить фото повреждения или опишите проблему.'
           });
           store.setIsProcessing(false);
           return;
@@ -99,7 +98,7 @@ export function ResidentChat({ store }: Props) {
         if (fusion.classificationResult === 'OTHER_INCIDENT') {
           store.addMessage({
             role: 'ai',
-            content: '🔍 Похоже, проблема связана с домом, но её тип пока не удалось определить с высокой уверенностью.\n\nПожалуйста, опишите подробнее, что произошло?'
+            content: '🔍 Проблема связана с домом, но тип не удалось определить.\n\nОпишите подробнее, что произошло?'
           });
           store.setIsProcessing(false);
           return;
@@ -108,7 +107,7 @@ export function ResidentChat({ store }: Props) {
         if (fusion.classificationResult === 'CONFLICT') {
           store.addMessage({
             role: 'ai',
-            content: '⚠️ Мы заметили несоответствие между описанием и фотографией. Уточните, пожалуйста, что именно произошло?'
+            content: '⚠️ Несоответствие между описанием и фото. Уточните, что произошло?'
           });
           store.setIsProcessing(false);
           return;
@@ -131,7 +130,7 @@ export function ResidentChat({ store }: Props) {
       } catch {
         store.addMessage({
           role: 'ai',
-          content: '❌ Произошла ошибка при обработке. Попробуйте ещё раз.'
+          content: '❌ Ошибка обработки. Попробуйте ещё раз.'
         });
       }
       
@@ -145,16 +144,13 @@ export function ResidentChat({ store }: Props) {
     
     const cardContent = `✅ Мы поняли проблему так:
 
-📋 Категория: ${category?.name || 'Не определена'}
-📍 Подкатегория: ${subcategory?.name || 'Не определена'}
-⚡ Предварительная срочность: ${getSeverityLabel(fusion.severity)}
-🎯 Уверенность AI: ${Math.round(fusion.confidence * 100)}%
-👷 Рекомендуемый исполнитель: ${getWorkerTypeName(fusion.recommendedWorkerType)}
-📝 Описание: "${text || 'По фотографии'}"
+📋 ${category?.name || 'Не определена'}
+📍 ${subcategory?.name || 'Не определена'}
+⚡ ${getSeverityLabel(fusion.severity)}
+🎯 ${Math.round(fusion.confidence * 100)}%
+👷 ${getWorkerTypeName(fusion.recommendedWorkerType)}
 
-${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены признаки критической ситуации!' : ''}
-
-Подтвердите заявку для отправки исполнителю.`;
+${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация!\n\n' : ''}Подтвердите заявку.`;
     
     store.addMessage({ role: 'ai', content: cardContent });
     store.setPendingFusion(fusion);
@@ -170,12 +166,12 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
       id: `INC-${String(store.incidents.length + 1).padStart(3, '0')}`,
       timestamp: Date.now(),
       userId: 'resident-demo',
-      userName: 'Вы (демо)',
+      userName: 'Вы',
       buildingId: store.selectedBuilding,
       address: building?.address || 'ул. Примерная, д. 1',
       category: fusion.category,
       subcategory: fusion.subcategory,
-      description: incidentDraft.text || 'Описание по фотографии',
+      description: incidentDraft.text || 'По фотографии',
       media: incidentDraft.imageType ? [{ id: 'img-1', type: 'image', url: '' }] : [],
       severity: fusion.severity,
       confidence: fusion.confidence,
@@ -202,7 +198,7 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
     
     store.addMessage({
       role: 'ai',
-      content: `✅ Заявка #${incident.id} создана и отправлена исполнителям!\n\nОжидайте — свободный мастер возьмёт её в работу. Перейдите на вкладку «Мастер» чтобы увидеть заявку в очереди.`
+      content: `✅ Заявка #${incident.id} создана!\n\nОжидайте — мастер возьмёт её в работу.`
     });
   };
 
@@ -233,9 +229,9 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
   const quickExamples = [
     { text: 'В подвале течёт труба', icon: '💧' },
     { text: 'Во дворе упало дерево', icon: '🌳' },
-    { text: 'Не работает свет на лестнице', icon: '⚡' },
-    { text: 'В подъезде очень грязно', icon: '🧹' },
-    { text: 'Сломана входная дверь', icon: '🚪' }
+    { text: 'Не работает свет', icon: '⚡' },
+    { text: 'В подъезде грязно', icon: '🧹' },
+    { text: 'Сломана дверь', icon: '🚪' }
   ];
 
   const showClarificationInput = store.pendingFusion && 
@@ -248,85 +244,115 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
     !store.currentIncident;
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+    <div className="flex flex-col h-full">
+      {/* MAX-style chat header */}
+      <div 
+        className="shrink-0 border-b px-4 py-3 flex items-center gap-3"
+        style={{ 
+          background: 'var(--max-background)', 
+          borderColor: 'var(--max-border)' 
+        }}
+      >
+        <div 
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{ background: 'var(--max-primary)' }}
+        >
           <span className="text-white text-lg">🏠</span>
         </div>
-        <div>
-          <h2 className="font-semibold text-gray-900">Аварийный диспетчер</h2>
-          <p className="text-xs text-gray-500">MAX • Онлайн</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--max-text-primary)' }}>
+            Аварийный диспетчер
+          </h2>
+          <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
+            бот • онлайн
+          </p>
         </div>
-        <div className="ml-auto">
-          <select
-            value={store.selectedBuilding}
-            onChange={e => store.setSelectedBuilding(e.target.value)}
-            className="text-xs border rounded px-2 py-1 bg-white"
-          >
-            {mockBuildings.map(b => (
-              <option key={b.id} value={b.id}>{b.address}</option>
-            ))}
-          </select>
-        </div>
+        <select
+          value={store.selectedBuilding}
+          onChange={e => store.setSelectedBuilding(e.target.value)}
+          className="text-xs rounded-full px-3 py-1.5 border"
+          style={{ 
+            background: 'var(--max-surface)', 
+            borderColor: 'var(--max-border)',
+            color: 'var(--max-text-primary)' 
+          }}
+        >
+          {mockBuildings.map(b => (
+            <option key={b.id} value={b.id}>{b.address}</option>
+          ))}
+        </select>
       </div>
       
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {store.messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
-              msg.role === 'user' 
-                ? 'bg-blue-600 text-white' 
-                : msg.content.includes('✅') 
-                  ? 'bg-green-50 border border-green-200 text-gray-800' 
-                  : msg.content.includes('🔍') || msg.content.includes('⚠️')
-                    ? 'bg-yellow-50 border border-yellow-200 text-gray-800'
-                    : msg.content.includes('❌')
-                      ? 'bg-red-50 border border-red-200 text-gray-800'
-                      : 'bg-white border border-gray-200 text-gray-800'
-            }`}>
-              <p className="text-sm whitespace-pre-line">{msg.content}</p>
+      {/* Messages area - MAX style */}
+      <div 
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
+        style={{ background: 'var(--max-surface)' }}
+      >
+        {store.messages.map((msg, idx) => (
+          <div 
+            key={msg.id} 
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
+          >
+            <div className={`max-w-[80%] ${msg.role === 'user' ? 'max-bubble max-bubble-outgoing' : 'max-bubble max-bubble-incoming'}`}>
+              <p className="text-sm whitespace-pre-line" style={{ color: 'var(--max-bubble-text)' }}>
+                {msg.content}
+              </p>
               {msg.media && (
-                <div className="mt-2 bg-gray-200 rounded-lg h-24 w-32 flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-gray-400" />
+                <div 
+                  className="mt-2 rounded-xl h-28 w-36 flex items-center justify-center"
+                  style={{ background: 'rgba(0,0,0,0.05)' }}
+                >
+                  <Camera className="w-8 h-8" style={{ color: 'var(--max-text-tertiary)' }} />
                 </div>
               )}
+              <p 
+                className="text-[10px] mt-1 text-right"
+                style={{ color: 'var(--max-text-tertiary)' }}
+              >
+                {new Date(msg.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
         ))}
         
+        {/* Confirm buttons */}
         {showConfirmButtons && (
-          <div className="flex justify-center gap-2 pt-2">
+          <div className="flex justify-center gap-2 pt-3 animate-fade-in">
             <button
               onClick={handleConfirmIncident}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+              className="max-btn max-btn-primary"
             >
               <CheckCircle className="w-4 h-4" />
-              Подтвердить заявку
+              Подтвердить
             </button>
             <button
               onClick={() => {
                 store.setPendingFusion(null);
                 store.addMessage({
                   role: 'ai',
-                  content: 'Заявка отменена. Опишите проблему иначе, если хотите попробовать снова.'
+                  content: 'Заявка отменена. Опишите проблему иначе.'
                 });
               }}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="max-btn max-btn-secondary"
             >
               Отменить
             </button>
           </div>
         )}
         
+        {/* Quick answers */}
         {store.pendingFusion && store.pendingFusion.recommendedQuestions[store.clarificationStep]?.options && (
-          <div className="flex flex-wrap gap-2 justify-center pt-2">
+          <div className="flex flex-wrap gap-2 justify-center pt-2 animate-fade-in">
             {store.pendingFusion.recommendedQuestions[store.clarificationStep].options!.map(opt => (
               <button
                 key={opt}
                 onClick={() => handleClarificationAnswer(opt)}
-                className="bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-full text-sm transition-colors"
+                className="px-4 py-2 rounded-full text-sm font-medium transition-all"
+                style={{ 
+                  background: 'var(--max-background)', 
+                  border: '1px solid var(--max-primary)',
+                  color: 'var(--max-primary)' 
+                }}
               >
                 {opt}
               </button>
@@ -339,14 +365,21 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
       
       {/* Quick examples */}
       {store.messages.length === 1 && (
-        <div className="px-4 pb-2">
-          <p className="text-xs text-gray-500 mb-2">Быстрые примеры:</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="px-4 py-2 shrink-0" style={{ background: 'var(--max-background)', borderTop: '1px solid var(--max-border)' }}>
+          <p className="text-xs mb-2 font-medium" style={{ color: 'var(--max-text-secondary)' }}>
+            Быстрые примеры
+          </p>
+          <div className="flex flex-wrap gap-1.5">
             {quickExamples.map(ex => (
               <button
                 key={ex.text}
                 onClick={() => setInput(ex.text)}
-                className="bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-full text-xs text-gray-700 transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                style={{ 
+                  background: 'var(--max-surface)', 
+                  color: 'var(--max-text-primary)',
+                  border: '1px solid var(--max-border)'
+                }}
               >
                 {ex.icon} {ex.text}
               </button>
@@ -357,9 +390,11 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
       
       {/* Image selector */}
       {showImageInput && (
-        <div className="px-4 pb-2">
-          <p className="text-xs text-gray-500 mb-2">Выберите тип фото для демо:</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="px-4 py-2 shrink-0" style={{ background: 'var(--max-background)', borderTop: '1px solid var(--max-border)' }}>
+          <p className="text-xs mb-2 font-medium" style={{ color: 'var(--max-text-secondary)' }}>
+            Выберите тип фото
+          </p>
+          <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'протечка', label: '💧 Протечка' },
               { id: 'грязь', label: '🧹 Грязь' },
@@ -371,11 +406,12 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
               <button
                 key={img.id}
                 onClick={() => setSelectedImageType(img.id)}
-                className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
-                  selectedImageType === img.id 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300'
-                }`}
+                className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+                style={{
+                  background: selectedImageType === img.id ? 'var(--max-primary)' : 'var(--max-surface)',
+                  color: selectedImageType === img.id ? 'white' : 'var(--max-text-primary)',
+                  border: `1px solid ${selectedImageType === img.id ? 'var(--max-primary)' : 'var(--max-border)'}`
+                }}
               >
                 {img.label}
               </button>
@@ -384,34 +420,41 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
         </div>
       )}
       
-      {/* Input area */}
-      <div className="bg-white border-t p-3">
-        {showClarificationInput && (
-          <div className="flex gap-2">
+      {/* Input area - MAX style */}
+      <div 
+        className="shrink-0 border-t px-3 py-2"
+        style={{ 
+          background: 'var(--max-background)', 
+          borderColor: 'var(--max-border)' 
+        }}
+      >
+        {showClarificationInput ? (
+          <div className="flex gap-2 items-center">
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && input.trim()) { handleClarificationAnswer(input); setInput(''); } }}
               placeholder="Введите ответ..."
-              className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+              className="flex-1 max-input"
             />
             <button
               onClick={() => { if (input.trim()) { handleClarificationAnswer(input); setInput(''); } }}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: 'var(--max-primary)' }}
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 text-white" />
             </button>
           </div>
-        )}
-        
-        {!showClarificationInput && (
-          <div className="flex gap-2">
+        ) : (
+          <div className="flex gap-2 items-center">
             <button
               onClick={() => setShowImageInput(!showImageInput)}
-              className={`rounded-full w-9 h-9 flex items-center justify-center transition-colors ${
-                showImageInput ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all"
+              style={{ 
+                background: showImageInput ? 'var(--max-primary)' : 'var(--max-surface)',
+                color: showImageInput ? 'white' : 'var(--max-text-secondary)'
+              }}
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -420,15 +463,19 @@ ${fusion.severity === 'CRITICAL' ? '🚨 ВНИМАНИЕ: Обнаружены 
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
-              placeholder="Опишите проблему или отправьте фото..."
-              className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+              placeholder="Сообщение..."
+              className="flex-1 max-input"
             />
             <button
               onClick={handleSend}
               disabled={store.isProcessing || (!input.trim() && !showImageInput)}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40"
+              style={{ background: 'var(--max-primary)' }}
             >
-              {store.isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {store.isProcessing 
+                ? <Loader2 className="w-4 h-4 text-white animate-spin" /> 
+                : <Send className="w-4 h-4 text-white" />
+              }
             </button>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, MapPin, AlertTriangle, CheckCircle, Wrench } from 'lucide-react';
+import { Clock, MapPin, AlertTriangle, CheckCircle, Wrench, ChevronRight } from 'lucide-react';
 import { AppStore } from '../store/useStore';
 import { getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel, getSeverityColor } from '../data/categories';
 import { Incident, IncidentStatus } from '../types';
@@ -20,20 +20,20 @@ const statusLabels: Record<IncidentStatus, string> = {
 };
 
 const statusColors: Record<IncidentStatus, string> = {
-  NEW: 'bg-blue-100 text-blue-800',
-  NEEDS_CLARIFICATION: 'bg-yellow-100 text-yellow-800',
-  READY: 'bg-indigo-100 text-indigo-800',
-  AVAILABLE: 'bg-green-100 text-green-800',
-  ASSIGNED: 'bg-purple-100 text-purple-800',
-  IN_PROGRESS: 'bg-orange-100 text-orange-800',
-  RESOLVED: 'bg-emerald-100 text-emerald-800',
-  CANCELLED: 'bg-gray-100 text-gray-800'
+  NEW: 'max-badge max-badge-primary',
+  NEEDS_CLARIFICATION: 'max-badge max-badge-warning',
+  READY: 'max-badge max-badge-primary',
+  AVAILABLE: 'max-badge max-badge-success',
+  ASSIGNED: 'max-badge max-badge-primary',
+  IN_PROGRESS: 'max-badge max-badge-warning',
+  RESOLVED: 'max-badge max-badge-success',
+  CANCELLED: 'max-badge max-badge-error'
 };
 
 export function MasterDashboard({ store }: Props) {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [filter, setFilter] = useState<'all' | 'available' | 'my'>('available');
-  const [currentMaster] = useState(store.masters[0]); // Demo as first master
+  const [filter, setFilter] = useState<'available' | 'my' | 'all'>('available');
+  const [currentMaster] = useState(store.masters[0]);
 
   const filteredIncidents = store.incidents.filter(inc => {
     if (filter === 'available') return inc.status === 'AVAILABLE';
@@ -57,55 +57,69 @@ export function MasterDashboard({ store }: Props) {
   const formatTime = (ts: number) => {
     const diff = Date.now() - ts;
     if (diff < 60000) return 'только что';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} мин назад`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} ч назад`;
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} мин`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)} ч`;
     return new Date(ts).toLocaleDateString('ru-RU');
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3">
+      <div 
+        className="shrink-0 border-b px-4 py-3"
+        style={{ background: 'var(--max-background)', borderColor: 'var(--max-border)' }}
+      >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center">
+          <div 
+            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: 'var(--max-warning)' }}
+          >
             <Wrench className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h2 className="font-semibold text-gray-900">{currentMaster.name}</h2>
-            <p className="text-xs text-gray-500">{getWorkerTypeName(currentMaster.workerType)} • Рейтинг: {currentMaster.rating}⭐</p>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--max-text-primary)' }}>
+              {currentMaster.name}
+            </h2>
+            <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
+              {getWorkerTypeName(currentMaster.workerType)} • {currentMaster.rating}⭐
+            </p>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Онлайн</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: '#E6F9E6' }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--max-success)' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--max-success)' }}>Онлайн</span>
           </div>
         </div>
         
         {/* Filters */}
-        <div className="flex gap-2 mt-3">
+        <div className="flex gap-1.5 mt-3">
           {[
-            { key: 'available', label: 'Доступные', count: store.incidents.filter(i => i.status === 'AVAILABLE').length },
-            { key: 'my', label: 'Мои заявки', count: store.incidents.filter(i => i.assignedWorker === currentMaster.id).length },
-            { key: 'all', label: 'Все', count: store.incidents.length }
+            { key: 'available' as const, label: 'Доступные', count: store.incidents.filter(i => i.status === 'AVAILABLE').length },
+            { key: 'my' as const, label: 'Мои', count: store.incidents.filter(i => i.assignedWorker === currentMaster.id).length },
+            { key: 'all' as const, label: 'Все', count: store.incidents.length }
           ].map(f => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key as typeof filter)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filter === f.key ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              onClick={() => setFilter(f.key)}
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+              style={{
+                background: filter === f.key ? 'var(--max-primary)' : 'var(--max-surface)',
+                color: filter === f.key ? 'white' : 'var(--max-text-secondary)',
+                border: `1px solid ${filter === f.key ? 'var(--max-primary)' : 'var(--max-border)'}`
+              }}
             >
-              {f.label} ({f.count})
+              {f.label} {f.count > 0 && `(${f.count})`}
             </button>
           ))}
         </div>
       </div>
       
       {/* Incident list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ background: 'var(--max-surface)' }}>
         {filteredIncidents.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <Wrench className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm">Нет доступных заявок</p>
-            <p className="text-xs mt-1">Перейдите на вкладку «Житель» чтобы создать заявку</p>
+          <div className="text-center py-16">
+            <Wrench className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--max-text-tertiary)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--max-text-secondary)' }}>Нет заявок</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--max-text-tertiary)' }}>Перейдите на вкладку «Житель» чтобы создать</p>
           </div>
         )}
         
@@ -116,41 +130,56 @@ export function MasterDashboard({ store }: Props) {
           return (
             <div
               key={incident.id}
-              className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => setSelectedIncident(incident)}
+              className="rounded-2xl p-3 cursor-pointer transition-all active:scale-[0.98]"
+              style={{ 
+                background: 'var(--max-background)', 
+                border: '1px solid var(--max-border)',
+                boxShadow: 'var(--max-shadow-sm)'
+              }}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{category?.icon || '📋'}</span>
-                  <div>
-                    <h3 className="font-medium text-gray-900 text-sm">{category?.name || 'Не определено'}</h3>
-                    <p className="text-xs text-gray-500">{subcategory?.name || 'Уточняется'}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-2xl shrink-0">{category?.icon || '📋'}</span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--max-text-primary)' }}>
+                      {category?.name || 'Не определено'}
+                    </h3>
+                    <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
+                      {subcategory?.name || 'Уточняется'}
+                    </p>
                   </div>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[incident.status]}`}>
+                <span className={statusColors[incident.status]}>
                   {statusLabels[incident.status]}
                 </span>
               </div>
               
-              <p className="text-sm text-gray-700 mt-2 line-clamp-2">{incident.description}</p>
+              <p className="text-sm mt-2 line-clamp-2" style={{ color: 'var(--max-text-primary)' }}>
+                {incident.description}
+              </p>
               
-              <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-                <span className="flex items-center gap-1">
+              <div className="flex items-center gap-3 mt-2">
+                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--max-text-secondary)' }}>
                   <MapPin className="w-3 h-3" />
                   {incident.address}
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--max-text-secondary)' }}>
                   <Clock className="w-3 h-3" />
                   {formatTime(incident.createdAt)}
                 </span>
               </div>
               
-              <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center justify-between mt-3 pt-2" style={{ borderTop: '1px solid var(--max-border)' }}>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getSeverityColor(incident.severity)}`}>
+                  <span className={`max-badge ${
+                    incident.severity === 'CRITICAL' ? 'max-badge-error' :
+                    incident.severity === 'HIGH' ? 'max-badge-warning' :
+                    incident.severity === 'MEDIUM' ? 'max-badge-primary' : 'max-badge-success'
+                  }`}>
                     {getSeverityLabel(incident.severity)}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs" style={{ color: 'var(--max-text-tertiary)' }}>
                     AI: {Math.round(incident.confidence * 100)}%
                   </span>
                 </div>
@@ -158,27 +187,28 @@ export function MasterDashboard({ store }: Props) {
                 {incident.status === 'AVAILABLE' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleTakeIncident(incident); }}
-                    className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                    className="max-btn max-btn-primary text-xs py-1.5 px-3"
                   >
-                    Взять заявку
+                    Взять
                   </button>
                 )}
                 
                 {incident.status === 'ASSIGNED' && incident.assignedWorker === currentMaster.id && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleStartWork(incident); }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                    className="max-btn max-btn-primary text-xs py-1.5 px-3"
                   >
-                    Начать работу
+                    Начать
                   </button>
                 )}
                 
                 {incident.status === 'IN_PROGRESS' && incident.assignedWorker === currentMaster.id && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleResolve(incident); }}
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                    className="max-btn text-xs py-1.5 px-3"
+                    style={{ background: 'var(--max-success)', color: 'white' }}
                   >
-                    ✓ Выполнено
+                    ✓ Готово
                   </button>
                 )}
               </div>
@@ -187,87 +217,128 @@ export function MasterDashboard({ store }: Props) {
         })}
       </div>
       
-      {/* Incident detail modal */}
+      {/* Modal */}
       {selectedIncident && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedIncident(null)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-5">
+        <div 
+          className="fixed inset-0 flex items-end sm:items-center justify-center z-50 animate-fade-in"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setSelectedIncident(null)}
+        >
+          <div 
+            className="w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] overflow-y-auto animate-slide-up"
+            style={{ background: 'var(--max-background)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg text-gray-900">Заявка #{selectedIncident.id}</h3>
-                <button onClick={() => setSelectedIncident(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--max-text-primary)' }}>
+                  Заявка #{selectedIncident.id}
+                </h3>
+                <button 
+                  onClick={() => setSelectedIncident(null)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--max-surface)' }}
+                >
+                  ✕
+                </button>
               </div>
               
               {/* Status timeline */}
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">История статусов</h4>
-                <div className="space-y-2">
+              <div className="mb-4 p-3 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+                <p className="text-xs font-medium mb-2" style={{ color: 'var(--max-text-secondary)' }}>
+                  История статусов
+                </p>
+                <div className="space-y-1.5">
                   {selectedIncident.statusHistory.map((change, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-xs">
-                      <div className={`w-2 h-2 rounded-full ${idx === selectedIncident.statusHistory.length - 1 ? 'bg-green-500' : 'bg-gray-300'}`} />
-                      <span className="text-gray-600">{statusLabels[change.to]}</span>
-                      <span className="text-gray-400">• {change.by}</span>
-                      <span className="text-gray-400 ml-auto">{formatTime(change.timestamp)}</span>
+                      <div 
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ 
+                          background: idx === selectedIncident.statusHistory.length - 1 
+                            ? 'var(--max-success)' 
+                            : 'var(--max-text-tertiary)' 
+                        }}
+                      />
+                      <span style={{ color: 'var(--max-text-primary)' }}>{statusLabels[change.to]}</span>
+                      <span style={{ color: 'var(--max-text-tertiary)' }}>• {change.by}</span>
+                      <span className="ml-auto" style={{ color: 'var(--max-text-tertiary)' }}>
+                        {formatTime(change.timestamp)}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
               
               {/* Details */}
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{getCategoryById(selectedIncident.category || '')?.icon || '📋'}</span>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">{getCategoryById(selectedIncident.category || '')?.icon || '📋'}</span>
                   <div>
-                    <p className="font-medium text-sm">{getCategoryById(selectedIncident.category || '')?.name || 'Не определено'}</p>
-                    <p className="text-xs text-gray-500">{getSubcategoryById(selectedIncident.category || '', selectedIncident.subcategory || '')?.name || ''}</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--max-text-primary)' }}>
+                      {getCategoryById(selectedIncident.category || '')?.name || 'Не определено'}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--max-text-secondary)' }}>
+                      {getSubcategoryById(selectedIncident.category || '', selectedIncident.subcategory || '')?.name || ''}
+                    </p>
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-sm text-gray-700">{selectedIncident.description}</p>
+                <div className="p-3 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+                  <p className="text-sm" style={{ color: 'var(--max-text-primary)' }}>
+                    {selectedIncident.description}
+                  </p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <span className="text-gray-500">Адрес</span>
-                    <p className="font-medium text-gray-800">{selectedIncident.address}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+                    <p className="text-xs" style={{ color: 'var(--max-text-secondary)' }}>Адрес</p>
+                    <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--max-text-primary)' }}>
+                      {selectedIncident.address}
+                    </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <span className="text-gray-500">Место</span>
-                    <p className="font-medium text-gray-800">{selectedIncident.location}</p>
+                  <div className="p-2.5 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+                    <p className="text-xs" style={{ color: 'var(--max-text-secondary)' }}>Место</p>
+                    <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--max-text-primary)' }}>
+                      {selectedIncident.location}
+                    </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <span className="text-gray-500">Срочность</span>
-                    <p className={`font-medium ${getSeverityColor(selectedIncident.severity)} px-2 py-0.5 rounded inline-block`}>
+                  <div className="p-2.5 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+                    <p className="text-xs" style={{ color: 'var(--max-text-secondary)' }}>Срочность</p>
+                    <p className={`max-badge mt-1 ${
+                      selectedIncident.severity === 'CRITICAL' ? 'max-badge-error' :
+                      selectedIncident.severity === 'HIGH' ? 'max-badge-warning' :
+                      selectedIncident.severity === 'MEDIUM' ? 'max-badge-primary' : 'max-badge-success'
+                    }`}>
                       {getSeverityLabel(selectedIncident.severity)}
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <span className="text-gray-500">AI уверенность</span>
-                    <p className="font-medium text-gray-800">{Math.round(selectedIncident.confidence * 100)}%</p>
+                  <div className="p-2.5 rounded-xl" style={{ background: 'var(--max-surface)' }}>
+                    <p className="text-xs" style={{ color: 'var(--max-text-secondary)' }}>AI</p>
+                    <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--max-text-primary)' }}>
+                      {Math.round(selectedIncident.confidence * 100)}%
+                    </p>
                   </div>
                 </div>
                 
-                <div className="text-xs text-gray-500">
-                  <p>Житель: {selectedIncident.userName}</p>
-                  <p>Режим ввода: {selectedIncident.inputMode === 'TEXT_ONLY' ? 'Только текст' : selectedIncident.inputMode === 'IMAGE_ONLY' ? 'Только фото' : 'Текст + фото'}</p>
-                  {selectedIncident.assignedWorkerName && <p>Исполнитель: {selectedIncident.assignedWorkerName}</p>}
-                </div>
-                
-                {/* Safety warnings */}
                 {selectedIncident.severity === 'CRITICAL' && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-600" />
-                    <p className="text-xs text-red-700 font-medium">Критическая ситуация — требуется немедленное реагирование</p>
+                  <div 
+                    className="flex items-center gap-2 p-3 rounded-xl"
+                    style={{ background: '#FFE6E6', border: '1px solid var(--max-error)' }}
+                  >
+                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: 'var(--max-error)' }} />
+                    <p className="text-xs font-medium" style={{ color: 'var(--max-error)' }}>
+                      Критическая ситуация — требуется немедленное реагирование
+                    </p>
                   </div>
                 )}
               </div>
               
               {/* Actions */}
-              <div className="flex gap-2 mt-5 pt-4 border-t">
+              <div className="flex gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--max-border)' }}>
                 {selectedIncident.status === 'AVAILABLE' && (
                   <button
                     onClick={() => handleTakeIncident(selectedIncident)}
-                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-medium text-sm transition-colors"
+                    className="flex-1 max-btn max-btn-primary py-3"
                   >
                     Взять заявку
                   </button>
@@ -275,7 +346,7 @@ export function MasterDashboard({ store }: Props) {
                 {selectedIncident.status === 'ASSIGNED' && selectedIncident.assignedWorker === currentMaster.id && (
                   <button
                     onClick={() => handleStartWork(selectedIncident)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium text-sm transition-colors"
+                    className="flex-1 max-btn max-btn-primary py-3"
                   >
                     Начать работу
                   </button>
@@ -283,15 +354,21 @@ export function MasterDashboard({ store }: Props) {
                 {selectedIncident.status === 'IN_PROGRESS' && selectedIncident.assignedWorker === currentMaster.id && (
                   <button
                     onClick={() => handleResolve(selectedIncident)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium text-sm transition-colors"
+                    className="flex-1 max-btn py-3"
+                    style={{ background: 'var(--max-success)', color: 'white' }}
                   >
                     ✓ Выполнено
                   </button>
                 )}
                 {selectedIncident.status === 'RESOLVED' && (
-                  <div className="flex-1 bg-green-50 text-green-700 py-2.5 rounded-lg font-medium text-sm text-center flex items-center justify-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Заявка выполнена
+                  <div 
+                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl"
+                    style={{ background: '#E6F9E6' }}
+                  >
+                    <CheckCircle className="w-4 h-4" style={{ color: 'var(--max-success)' }} />
+                    <span className="text-sm font-medium" style={{ color: 'var(--max-success)' }}>
+                      Выполнено
+                    </span>
                   </div>
                 )}
               </div>
