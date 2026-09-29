@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Camera, Loader2, CheckCircle, X, Edit } from 'lucide-react';
 import { AppStore } from '../store/useStore';
-import { analyzeText, analyzeImage, fuseResults, FusionResult } from '../data/aiEngine';
+import { analyzeText, analyzeImage, analyzeTextReal, analyzeImageReal, checkMLHealth, fuseResults, FusionResult } from '../data/aiEngine';
 import { categories, getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
 import type { Incident, InputMode } from '../types';
 import { mockBuildings } from '../data/mockData';
@@ -20,6 +20,7 @@ export function ResidentChat({ store }: Props) {
   const [editCategory, setEditCategory] = useState<string>('');
   const [editSubcategory, setEditSubcategory] = useState<string>('');
   const [editDescription, setEditDescription] = useState<string>('');
+  const [mlApiAvailable, setMlApiAvailable] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [incidentDraft, setIncidentDraft] = useState<{
@@ -33,6 +34,14 @@ export function ResidentChat({ store }: Props) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [store.messages]);
+
+  // Проверка доступности ML API при загрузке
+  useEffect(() => {
+    checkMLHealth().then(available => {
+      setMlApiAvailable(available);
+      console.log(available ? '✅ ML API доступен' : '⚠️ ML API недоступен, используется локальная симуляция');
+    });
+  }, []);
 
   // Закрытие меню при клике вне его
   useEffect(() => {
@@ -183,22 +192,42 @@ export function ResidentChat({ store }: Props) {
       });
       
       try {
-        // Локальная симуляция AI
-        const textResult = text ? await analyzeText(text) : null;
+        let textResult = null;
+        let visionResult = null;
         
-        // Если загружен реальный файл без текста — просим описать проблему
-        if (hasFile && !text && !hasDemoImage) {
-          store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
-          store.addMessage({
-            role: 'ai',
-            content: '📷 Фото получено!\n\n💡 Опишите проблему текстом для более точной классификации.\n\nИли выберите демо-режим для тестирования.'
-          });
-          store.setIsProcessing(false);
-          return;
+        // Если ML API доступен - используем реальный анализ
+        if (mlApiAvailable) {
+          console.log('✅ Используем ML API через прокси');
+          
+          if (text) {
+            textResult = await analyzeTextReal(text);
+          }
+          
+          if (hasFile && selectedFile) {
+            visionResult = await analyzeImageReal(selectedFile);
+          } else if (hasDemoImage) {
+            // Для демо-режима используем локальную симуляцию
+            visionResult = await analyzeImage(selectedImageType);
+          }
+        } else {
+          // Локальная симуляция AI
+          console.log('⚠️ ML API недоступен, используем локальную симуляцию');
+          textResult = text ? await analyzeText(text) : null;
+          
+          // Если загружен реальный файл без текста — просим описать проблему
+          if (hasFile && !text && !hasDemoImage) {
+            store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
+            store.addMessage({
+              role: 'ai',
+              content: '📷 Фото получено!\n\n💡 Опишите проблему текстом для более точной классификации.\n\nИли выберите демо-режим для тестирования.'
+            });
+            store.setIsProcessing(false);
+            return;
+          }
+          
+          const imageDesc = hasDemoImage ? selectedImageType : undefined;
+          visionResult = imageDesc ? await analyzeImage(imageDesc) : null;
         }
-        
-        const imageDesc = hasDemoImage ? selectedImageType : undefined;
-        const visionResult = imageDesc ? await analyzeImage(imageDesc) : null;
         
         const fusion = fuseResults(textResult, visionResult, inputMode);
         
@@ -419,6 +448,8 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
           </h2>
           <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
             бот • онлайн
+            {mlApiAvailable === true && ' • ML API ✓'}
+            {mlApiAvailable === false && ' • Симуляция'}
           </p>
         </div>
         <select
