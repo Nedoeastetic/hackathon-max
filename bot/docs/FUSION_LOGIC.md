@@ -251,6 +251,6 @@ npm run test:api
 
 ## Ссылки
 
-- [Документация API v2.1](http://193.108.113.153:8000/)
-- [Веб-тестер](http://193.108.113.153:8000/) — интерактивная проверка fusion
+- [Документация API v2.1](https://v3258578.hosted-by-vdsina.ru/)
+- [Веб-тестер](https://v3258578.hosted-by-vdsina.ru/) — интерактивная проверка fusion
 - [Код fusion engine](bot/src/ai/classifier.ts)

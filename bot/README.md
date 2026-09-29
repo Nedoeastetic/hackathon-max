@@ -162,12 +162,12 @@ bot/
 
 ### Health Check
 ```bash
-GET http://193.108.113.153:8000/api/health
+GET https://v3258578.hosted-by-vdsina.ru/api/health
 ```
 
 ### Text Analysis
 ```bash
-POST http://193.108.113.153:8000/api/text/analyze
+POST https://v3258578.hosted-by-vdsina.ru/api/text/analyze
 Content-Type: application/json
 
 {
@@ -188,7 +188,7 @@ Content-Type: application/json
 
 ### Vision Analysis
 ```bash
-POST http://193.108.113.153:8000/api/vision/analyze
+POST https://v3258578.hosted-by-vdsina.ru/api/vision/analyze
 Content-Type: multipart/form-data
 
 file: [image.jpg]
