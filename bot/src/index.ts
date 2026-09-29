@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Bot } from '@maxhub/max-bot-api';
 import { analyzeInput, AnalysisResult } from './ai/classifier.js';
+import { checkHealth } from './ai/api-client.js';
 import { categories, getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from './data/taxonomy.js';
 import { IncidentStore, Incident } from './store/incidents.js';
 
@@ -14,11 +15,10 @@ if (!TOKEN) {
 const bot = new Bot(TOKEN);
 const store = new IncidentStore();
 
-// Сессии пользователей: храним состояние диалога
+// Сессии пользователей
 interface Session {
   step: 'idle' | 'awaiting_clarification' | 'awaiting_confirmation';
   pendingText?: string;
-  pendingImageType?: string;
   analysis?: AnalysisResult;
   answers: Record<string, string>;
   questionIndex: number;
@@ -32,6 +32,16 @@ function getSession(userId: string): Session {
     sessions.set(userId, { step: 'idle', answers: {}, questionIndex: 0 });
   }
   return sessions.get(userId)!;
+}
+
+// Скачивание фото из MAX
+async function downloadImage(url: string): Promise<Buffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 // ====== Обработчики событий ======
@@ -62,10 +72,7 @@ bot.command('help', async (ctx) => {
 bot.command('start', async (ctx) => {
   const userId = String(ctx.message.sender.user_id);
   sessions.delete(userId);
-  await ctx.reply(
-    '🔄 Начинаем заново!\n\n' +
-    'Опишите проблему или пришлите фото.'
-  );
+  await ctx.reply('🔄 Начинаем заново!\n\nОпишите проблему или пришлите фото.');
 });
 
 bot.command('status', async (ctx) => {
@@ -92,15 +99,31 @@ bot.command('categories', async (ctx) => {
   await ctx.reply('📂 Доступные категории:\n\n' + lines.join('\n'));
 });
 
+bot.command('health', async (ctx) => {
+  try {
+    const health = await checkHealth();
+    await ctx.reply(
+      `✅ ML сервис работает!\n\n` +
+      `CV модель: ${health.models.cv}\n` +
+      `Text модель: ${health.models.text}`
+    );
+  } catch (error) {
+    await ctx.reply('❌ ML сервис недоступен');
+  }
+});
+
 // Обработка входящих сообщений
 bot.on('message_created', async (ctx) => {
   const userId = String(ctx.message.sender.user_id);
   const session = getSession(userId);
   const message = ctx.message;
   
-  // Извлекаем текст и фото
+  // Извлекаем текст
   const text = message.body?.text?.trim() || '';
-  const hasImage = message.attachments?.some((a: any) => a.type === 'image') || false;
+  
+  // Проверяем наличие фото
+  const imageAttachment = message.attachments?.find((a: any) => a.type === 'image' || a.type === 'photo');
+  const hasImage = !!imageAttachment;
   
   // Если пользователь отвечает на уточняющий вопрос
   if (session.step === 'awaiting_clarification' && session.analysis) {
@@ -108,17 +131,17 @@ bot.on('message_created', async (ctx) => {
     return;
   }
   
-  // Если пользователь подтверждает заявку (кнопка)
-  if (session.step === 'awaiting_confirmation' && text.toLowerCase().includes('подтвер')) {
-    await confirmIncident(ctx, userId, session);
-    return;
-  }
-  
-  // Если пользователь отменяет
-  if (session.step === 'awaiting_confirmation' && text.toLowerCase().includes('отмен')) {
-    sessions.delete(userId);
-    await ctx.reply('❌ Заявка отменена. Опишите проблему иначе, если хотите попробовать снова.');
-    return;
+  // Подтверждение заявки
+  if (session.step === 'awaiting_confirmation') {
+    if (text.toLowerCase().includes('подтвер') || text.toLowerCase() === 'да' || text.toLowerCase() === 'ок') {
+      await confirmIncident(ctx, userId, session);
+      return;
+    }
+    if (text.toLowerCase().includes('отмен') || text.toLowerCase() === 'нет') {
+      sessions.delete(userId);
+      await ctx.reply('❌ Заявка отменена. Опишите проблему иначе, если хотите попробовать снова.');
+      return;
+    }
   }
   
   // Новый запрос
@@ -127,21 +150,41 @@ bot.on('message_created', async (ctx) => {
     return;
   }
   
-  // Показываем индикатор анализа
   await ctx.reply('⏳ Анализирую ваше обращение...');
   
   // Определяем режим ввода
   const mode = hasImage && text ? 'TEXT_AND_IMAGE' : hasImage ? 'IMAGE_ONLY' : 'TEXT_ONLY';
   
-  // Запускаем анализ
+  // Скачиваем фото если есть
+  let imageBuffer: Buffer | undefined;
+  let imageFilename = 'image.jpg';
+  
+  if (hasImage && imageAttachment) {
+    try {
+      // MAX API обычно возвращает URL в поле url или нужно получить через get_file
+      const imageUrl = imageAttachment.url || imageAttachment.file?.url;
+      if (imageUrl) {
+        imageBuffer = await downloadImage(imageUrl);
+        imageFilename = `image_${Date.now()}.jpg`;
+        console.log(`📷 Скачано фото: ${imageBuffer.length} bytes`);
+      }
+    } catch (error) {
+      console.error('❌ Не удалось скачать фото:', error);
+      await ctx.reply('⚠️ Не удалось обработать фото. Попробуйте ещё раз или опишите проблему текстом.');
+      return;
+    }
+  }
+  
+  // Запускаем анализ через ML API
   const result = await analyzeInput({
     text: text || undefined,
-    imageDescription: hasImage ? 'изображение' : undefined,
+    imageBuffer,
+    imageFilename,
     mode
   });
   
   // Обрабатываем результат
-  await handleAnalysisResult(ctx, userId, session, result, text, hasImage);
+  await handleAnalysisResult(ctx, userId, session, result, text);
 });
 
 // ====== Обработка результата анализа ======
@@ -151,13 +194,12 @@ async function handleAnalysisResult(
   userId: string,
   session: Session,
   result: AnalysisResult,
-  text: string,
-  hasImage: boolean
+  text: string
 ) {
   // NOT_INCIDENT
   if (result.classificationResult === 'NOT_INCIDENT') {
     await ctx.reply(
-      '🔍 На изображении / в тексте не удалось обнаружить проблему, связанную с содержанием дома.\n\n' +
+      '🔍 Не удалось обнаружить проблему, связанную с содержанием дома.\n\n' +
       'Попробуйте отправить фотографию повреждения или кратко опишите проблему.'
     );
     return;
@@ -172,7 +214,6 @@ async function handleAnalysisResult(
     session.step = 'awaiting_clarification';
     session.analysis = result;
     session.pendingText = text;
-    session.pendingImageType = hasImage ? 'unknown' : undefined;
     return;
   }
   
@@ -191,15 +232,12 @@ async function handleAnalysisResult(
   // KNOWN_INCIDENT или NEEDS_CLARIFICATION
   session.analysis = result;
   session.pendingText = text;
-  session.pendingImageType = hasImage ? 'image' : undefined;
   
   if (result.recommendedQuestions.length > 0) {
-    // Задаём первый вопрос
     session.step = 'awaiting_clarification';
     session.questionIndex = 0;
     await ctx.reply(result.recommendedQuestions[0].text);
   } else {
-    // Сразу показываем карточку
     await showIncidentCard(ctx, userId, session, result);
   }
 }
@@ -217,10 +255,8 @@ async function handleClarification(
   session.questionIndex++;
   
   if (session.questionIndex < analysis.recommendedQuestions.length) {
-    // Задаём следующий вопрос
     await ctx.reply(analysis.recommendedQuestions[session.questionIndex].text);
   } else {
-    // Все вопросы заданы — показываем карточку
     await showIncidentCard(ctx, userId, session, analysis);
   }
 }
@@ -300,19 +336,34 @@ function statusLabel(status: string): string {
 
 // ====== Запуск ======
 
-console.log('🤖 Аварийный диспетчер МКД запускается...');
-console.log('📡 Режим: Long Polling');
-console.log('');
-
-bot.start().then(() => {
+async function main() {
+  console.log('🤖 Аварийный диспетчер МКД запускается...');
+  
+  // Проверяем ML API
+  try {
+    const health = await checkHealth();
+    console.log('✅ ML сервис доступен');
+    console.log(`   CV модель: ${health.models.cv}`);
+    console.log(`   Text модель: ${health.models.text}`);
+  } catch (error) {
+    console.warn('⚠️ ML сервис недоступен, бот будет работать с fallback-логикой');
+  }
+  
+  console.log('');
+  console.log('📡 Режим: Long Polling');
+  console.log('');
+  
+  await bot.start();
   console.log('✅ Бот запущен и готов принимать сообщения!');
   console.log('   Нажмите Ctrl+C для остановки');
-}).catch(err => {
-  console.error('❌ Ошибка запуска бота:', err);
-  process.exit(1);
-});
+}
 
 // Обработка ошибок
 bot.catch((err, ctx) => {
   console.error('Ошибка в обработчике:', err);
+});
+
+main().catch(err => {
+  console.error('❌ Критическая ошибка:', err);
+  process.exit(1);
 });

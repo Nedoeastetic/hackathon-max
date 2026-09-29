@@ -1,12 +1,13 @@
 {
   "name": "dispatcher-max-bot",
   "version": "1.0.0",
-  "description": "Аварийный диспетчер МКД — бот для MAX",
+  "description": "Аварийный диспетчер МКД — бот для MAX с реальным AI",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test:api": "tsx test-api.ts"
   },
   "dependencies": {
     "@maxhub/max-bot-api": "^0.3.1",

@@ -1,6 +1,6 @@
-# 🤖 Аварийный диспетчер МКД — Бот для MAX
+# 🤖 Аварийный диспетчер МКД — Бот для MAX с реальным AI
 
-Чат-бот для мессенджера MAX, который автоматически обрабатывает обращения жителей о проблемах в доме.
+Чат-бот для мессенджера MAX, который автоматически обрабатывает обращения жителей о проблемах в доме, используя **реальные ML-модели** (CV + Text Classification).
 
 ## 🚀 Быстрый запуск
 
@@ -21,6 +21,7 @@ cp .env.example .env
 
 ```env
 MAX_BOT_TOKEN=ваш_токен_от_MasterBot
+ML_API_URL=http://193.108.113.153:8000
 ```
 
 ### 3. Запустите бота
@@ -32,10 +33,13 @@ npm run dev
 Вы увидите:
 ```
 🤖 Аварийный диспетчер МКД запускается...
+✅ ML сервис доступен
+   CV модель: cv-v3-2026-09-28
+   Text модель: text-v2-2026-09-28
+
 📡 Режим: Long Polling
 
 ✅ Бот запущен и готов принимать сообщения!
-   Нажмите Ctrl+C для остановки
 ```
 
 ### 4. Проверьте в MAX
@@ -43,7 +47,29 @@ npm run dev
 Найдите вашего бота в MAX и отправьте:
 - `В подвале течёт труба`
 - `Не работает свет на лестнице`
-- `Во дворе упало дерево`
+- Фото протечки
+- Фото кота (должен ответить NOT_INCIDENT)
+
+## 🧠 Как работает AI
+
+Бот использует **реальные ML-модели**, развернутые на удалённом сервере:
+
+### Text Classification
+- **Endpoint:** `POST /api/text/analyze`
+- **Модель:** text-v2 (специализированный классификатор)
+- **Возвращает:** категорию, подкатегорию, confidence, top-5 предсказаний
+
+### Computer Vision
+- **Endpoint:** `POST /api/vision/analyze`
+- **Модель:** cv-v3 (YOLO-based)
+- **Возвращает:** classificationResult (KNOWN/OTHER/NOT_INCIDENT), detected objects, visual severity
+
+### Fusion Engine
+Бот объединяет результаты text + vision:
+- Если текст и фото согласуются → высокая уверенность
+- Если противоречат → CONFLICT, запрашивает уточнение
+- Если только фото → задаёт вопросы для описания
+- Если только текст → использует text classifier
 
 ## 📋 Команды бота
 
@@ -51,6 +77,7 @@ npm run dev
 - `/help` — помощь
 - `/status` — статус ваших заявок
 - `/categories` — список категорий
+- `/health` — проверить статус ML сервиса
 
 ## 🧪 Примеры сценариев
 
@@ -58,31 +85,50 @@ npm run dev
 ```
 Вы: В подвале течёт труба, уже вся вода на полу
 Бот: ⏳ Анализирую ваше обращение...
-Бот: Вода продолжает поступать прямо сейчас?
-Вы: Да, вода идёт
+     [Text API: WATER_SUPPLY/PIPE_LEAK (0.94)]
 Бот: ✅ Мы поняли проблему так:
      📋 Категория: Водоснабжение
      📍 Подкатегория: Протечка трубы
      ⚡ Срочность: Высокий
-     🎯 Уверенность AI: 87%
+     🎯 Уверенность AI: 94%
      👷 Исполнитель: Сантехник
      
      Напишите "подтвердить" чтобы отправить заявку.
-Вы: подтвердить
-Бот: ✅ Заявка #INC-001 создана!
 ```
 
-### Сценарий 2: Нерелевантный контент
+### Сценарий 2: Фото протечки
+```
+Вы: [фото протечки]
+Бот: ⏳ Анализирую ваше обращение...
+     [Vision API: KNOWN_INCIDENT/WATER_SUPPLY (0.89)]
+Бот: Опишите подробнее, что произошло?
+Вы: Течёт труба в подвале
+Бот: ✅ Мы поняли проблему так...
+```
+
+### Сценарий 3: Текст + фото согласуются
+```
+Вы: Упало дерево [фото дерева]
+Бот: ⏳ Анализирую...
+     [Text: YARD/FALLEN_TREE (0.91)]
+     [Vision: KNOWN_INCIDENT/YARD (0.87)]
+Бот: ✅ Категория: Двор и территория
+     Подкатегория: Упавшее дерево
+     Уверенность: 89%
+```
+
+### Сценарий 4: Текст + фото противоречат
+```
+Вы: Упало дерево [фото протечки]
+Бот: ⚠️ Мы заметили несоответствие между описанием и фото.
+     Уточните, что именно произошло?
+```
+
+### Сценарий 5: Нерелевантный контент
 ```
 Вы: [фото кота]
-Бот: 🔍 На изображении не удалось обнаружить проблему...
-```
-
-### Сценарий 3: Неизвестная проблема
-```
-Вы: Что-то странное с трубой
-Бот: 🔍 Похоже, проблема связана с домом, но её тип не удалось определить.
-     Пожалуйста, опишите подробнее, что произошло?
+Бот: 🔍 Не удалось обнаружить проблему...
+     [Vision API: NOT_INCIDENT (0.95)]
 ```
 
 ## 🏗 Архитектура
@@ -90,110 +136,88 @@ npm run dev
 ```
 bot/
 ├── src/
-│   ├── index.ts          # Главный файл бота
+│   ├── index.ts              # Главный файл бота
 │   ├── ai/
-│   │   └── classifier.ts # AI-классификация (rule-based)
+│   │   ├── api-client.ts     # HTTP-клиент для ML API
+│   │   └── classifier.ts     # Fusion engine + логика
 │   ├── data/
-│   │   └── taxonomy.ts   # Категории и подкатегории
+│   │   └── taxonomy.ts       # Категории и маппинги
 │   └── store/
-│       └── incidents.ts  # Хранилище заявок
-├── .env                  # Токен (создать вручную)
-├── .env.example          # Шаблон
+│       └── incidents.ts      # Хранилище заявок
+├── .env                      # Токен + ML API URL
+├── .env.example
 ├── package.json
 └── tsconfig.json
 ```
 
-## 🔧 Как это работает
+## 🔧 ML API Endpoints
 
-1. **Пользователь отправляет сообщение** (текст или фото)
-2. **Бот получает событие** через Long Polling
-3. **AI-классификатор анализирует** текст/фото:
-   - Определяет категорию (водоснабжение, электричество и т.д.)
-   - Определяет подкатегорию (протечка, нет света и т.д.)
-   - Оценивает срочность (LOW/MEDIUM/HIGH/CRITICAL)
-   - Вычисляет уверенность (0-100%)
-4. **Если нужны уточнения** — бот задаёт вопросы
-5. **Показывает карточку заявки** пользователю
-6. **Пользователь подтверждает** — заявка создаётся
-7. **Заявка доступна мастерам** (в реальном проекте — через мини-приложение)
-
-## 🎯 Что дальше?
-
-### Заменить rule-based на реальные AI-модели
-
-В `src/ai/classifier.ts` замените функцию `analyzeInput` на вызов YandexGPT:
-
-```typescript
-import { analyzeWithYandexGPT } from './yandex-gpt.js';
-
-export async function analyzeInput(input: AnalysisInput): Promise<AnalysisResult> {
-  // Используйте YandexGPT для классификации
-  return await analyzeWithYandexGPT(input);
-}
+### Health Check
+```bash
+GET http://193.108.113.153:8000/api/health
 ```
 
-Пример промпта для YandexGPT:
-```
-Ты — классификатор обращений жителей МКД.
-Проанализируй текст и верни JSON:
+### Text Analysis
+```bash
+POST http://193.108.113.153:8000/api/text/analyze
+Content-Type: application/json
+
 {
-  "classificationResult": "KNOWN_INCIDENT" | "OTHER_INCIDENT" | "NOT_INCIDENT",
-  "category": string | null,
-  "subcategory": string | null,
-  "confidence": number (0-1),
-  "severity": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-}
-
-Категории: WATER_SUPPLY, ELECTRICITY, CLEANING, YARD, DOOR, ELEVATOR
-```
-
-### Подключить базу данных
-
-Замените `IncidentStore` на PostgreSQL:
-
-```typescript
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
-
-export class IncidentStore {
-  async create(incident: Incident): Promise<void> {
-    await pool.query(
-      'INSERT INTO incidents (id, user_id, category, ...) VALUES ($1, $2, $3, ...)',
-      [incident.id, incident.userId, incident.category, ...]
-    );
-  }
+  "text": "течет труба в подвале"
 }
 ```
 
-### Добавить мини-приложение для мастеров
-
-1. Создайте React-приложение (используйте наш прототип из `src/components/MasterDashboard.tsx`)
-2. Разместите на HTTPS-хостинге
-3. В кабинете бота укажите URL мини-приложения
-4. Добавьте кнопку в бот:
-
-```typescript
-bot.command('master', async (ctx) => {
-  await ctx.reply('Откройте интерфейс мастера:', {
-    keyboard: {
-      inline_keyboard: [[{
-        text: '📋 Открыть заявки',
-        callback_data: 'open_master_app'
-      }]]
-    }
-  });
-});
+**Ответ:**
+```json
+{
+  "category": "WATER_SUPPLY",
+  "subcategory": "PIPE_LEAK",
+  "confidence": 0.94,
+  "top": [["PIPE_LEAK", 0.94], ["RADIATOR_LEAK", 0.04]],
+  "modelVersion": "text-v2-2026-09-28"
+}
 ```
+
+### Vision Analysis
+```bash
+POST http://193.108.113.153:8000/api/vision/analyze
+Content-Type: multipart/form-data
+
+file: [image.jpg]
+```
+
+**Ответ:**
+```json
+{
+  "classificationResult": "KNOWN_INCIDENT",
+  "category": "WATER_SUPPLY",
+  "subcategory": null,
+  "detectedObjects": ["water_supply"],
+  "visualSeverity": "HIGH",
+  "confidence": 0.896,
+  "modelVersion": "cv-v3-2026-09-28"
+}
+```
+
+## 🎯 Особенности реализации
+
+### Hot Reload
+ML сервер поддерживает hot-reload. Если модели обновятся, `modelVersion` изменится, но бот продолжит работать без перезапуска.
+
+### Fallback
+Если ML API недоступен, бот использует fallback-логику (возвращает NOT_INCIDENT с confidence=0).
+
+### Download Images
+Бот автоматически скачивает фото из MAX и передаёт в Vision API как multipart/form-data.
+
+### Session Management
+Каждый пользователь имеет свою сессию с состоянием диалога (ожидание уточнения, подтверждение и т.д.).
 
 ## 🔗 Полезные ссылки
 
 - [Документация MAX](https://dev.max.ru/)
 - [SDK для TypeScript](https://github.com/max-messenger/max-bot-api-client-ts)
 - [Примеры ботов](https://dev.max.ru/docs/chatbots/bots-coding/examples)
-- [API ботов](https://dev.max.ru/docs-api)
 
 ## 📝 Лицензия
 
@@ -201,4 +225,4 @@ MIT
 
 ---
 
-**Для хакатона:** Этот бот демонстрирует полный сценарий обработки обращений жителей МКД через MAX с автоматической классификацией и маршрутизацией.
+**Для хакатона:** Бот демонстрирует полный сценарий обработки обращений с использованием реальных ML-моделей (CV + Text Classification), fusion engine для мультимодального анализа и автоматической маршрутизацией заявок.
