@@ -1,7 +1,7 @@
 // HTTP-клиент для ML API v2.1
 // Документация: http://193.108.113.153:8000/
 
-const BASE_URL = process.env.ML_API_URL || 'http://193.108.113.153:8000';
+const BASE_URL = process.env.ML_API_URL || 'https://v3258578.hosted-by-vdsina.ru';
 const REQUEST_TIMEOUT = 15000; // 15 секунд (первый запрос грузит модель ~1-2с)
 
 // ====== Типы ответов API ======

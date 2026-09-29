@@ -6,7 +6,7 @@ const FormData = require('form-data');
 
 const app = express();
 const PORT = 3001;
-const ML_API_URL = 'http://193.108.113.153:8000';
+const ML_API_URL = 'https://v3258578.hosted-by-vdsina.ru';
 
 // Отключаем SSL проверку
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';

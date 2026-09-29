@@ -114,7 +114,7 @@ cp .env.example .env
 MAX_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 
 # ML API (уже настроен)
-ML_API_URL=http://193.108.113.153:8000
+ML_API_URL=https://v3258578.hosted-by-vdsina.ru
 ```
 
 **Важно:** Замените `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz` на ваш реальный токен!
@@ -129,7 +129,7 @@ npm run test:api
 ```
 🧪 Тестирование ML API
 
-Base URL: http://193.108.113.153:8000
+Base URL: https://v3258578.hosted-by-vdsina.ru
 
 ──────────────────────────────────────────────────────────
 
@@ -218,7 +218,7 @@ npm run dev
 
 **Решение:** 
 - Это не критично — бот продолжит работать с fallback-логикой
-- Проверьте доступность сервера: `curl http://193.108.113.153:8000/api/health`
+- Проверьте доступность сервера: `curl https://v3258578.hosted-by-vdsina.ru/api/health`
 
 ### Проблема: Бот не отвечает в MAX
 

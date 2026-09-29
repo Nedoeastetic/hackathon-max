@@ -8,7 +8,7 @@ import 'dotenv/config';
 import { checkHealth, analyzeText, analyzeImage } from './src/ai/api-client.js';
 import fs from 'fs';
 
-const BASE_URL = process.env.ML_API_URL || 'http://193.108.113.153:8000';
+const BASE_URL = process.env.ML_API_URL || 'https://v3258578.hosted-by-vdsina.ru';
 
 async function testHealth() {
   console.log('🔍 Проверка здоровья ML API...\n');

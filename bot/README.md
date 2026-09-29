@@ -29,7 +29,7 @@ cp .env.example .env
 
 ```env
 MAX_BOT_TOKEN=ваш_токен_от_MasterBot
-ML_API_URL=http://193.108.113.153:8000
+ML_API_URL=https://v3258578.hosted-by-vdsina.ru
 ```
 
 ### 3. Запустите бота
