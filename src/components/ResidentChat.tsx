@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Camera, Loader2, CheckCircle, X } from 'lucide-react';
+import { Send, Camera, Loader2, CheckCircle, X, Edit } from 'lucide-react';
 import { AppStore } from '../store/useStore';
 import { analyzeText, analyzeImage, analyzeTextReal, analyzeImageReal, checkMLHealth, fuseResults, FusionResult } from '../data/aiEngine';
-import { getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
+import { categories, getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
 import { Incident, InputMode } from '../types';
 import { mockBuildings } from '../data/mockData';
 
@@ -16,6 +16,10 @@ export function ResidentChat({ store }: Props) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showDemoMode, setShowDemoMode] = useState(false);
   const [selectedImageType, setSelectedImageType] = useState<string>('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editCategory, setEditCategory] = useState<string>('');
+  const [editSubcategory, setEditSubcategory] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [incidentDraft, setIncidentDraft] = useState<{
@@ -98,6 +102,48 @@ export function ResidentChat({ store }: Props) {
   // Открыть диалог выбора файла
   const handleOpenFilePicker = () => {
     fileInputRef.current?.click();
+  };
+
+  // Открыть модальное окно редактирования
+  const handleOpenEditModal = () => {
+    if (!store.pendingFusion) return;
+    
+    setEditCategory(store.pendingFusion.category || '');
+    setEditSubcategory(store.pendingFusion.subcategory || '');
+    setEditDescription(incidentDraft.text || '');
+    setShowEditModal(true);
+  };
+
+  // Сохранить изменения из модального окна
+  const handleSaveEdit = () => {
+    if (!store.pendingFusion) return;
+    
+    const updatedFusion: FusionResult = {
+      ...store.pendingFusion,
+      category: editCategory || null,
+      subcategory: editSubcategory || null,
+    };
+    
+    // Определяем тип исполнителя на основе новой категории
+    if (editCategory) {
+      const category = getCategoryById(editCategory);
+      if (category) {
+        updatedFusion.recommendedWorkerType = category.defaultWorker;
+      }
+    }
+    
+    store.setPendingFusion(updatedFusion);
+    setIncidentDraft(prev => ({ ...prev, text: editDescription }));
+    setShowEditModal(false);
+    
+    // Показываем обновлённую карточку
+    const category = editCategory ? getCategoryById(editCategory) : null;
+    const subcategory = editCategory && editSubcategory ? getSubcategoryById(editCategory, editSubcategory) : null;
+    
+    store.addMessage({
+      role: 'ai',
+      content: `✏️ Заявка обновлена:\n\n📋 ${category?.name || 'Не определена'}\n📍 ${subcategory?.name || 'Не определена'}\n👷 ${getWorkerTypeName(updatedFusion.recommendedWorkerType)}\n\nПодтвердите заявку.`
+    });
   };
 
   const handleSend = async () => {
@@ -423,6 +469,13 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
               Подтвердить
             </button>
             <button
+              onClick={handleOpenEditModal}
+              className="max-btn max-btn-secondary"
+            >
+              <Edit className="w-4 h-4" />
+              Редактировать
+            </button>
+            <button
               onClick={() => {
                 store.setPendingFusion(null);
                 store.addMessage({
@@ -697,6 +750,123 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => setShowEditModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--max-text-primary)' }}>
+                  ✏️ Редактировать заявку
+                </h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5" style={{ color: 'var(--max-text-secondary)' }} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--max-text-primary)' }}>
+                    Категория
+                  </label>
+                  <select
+                    value={editCategory}
+                    onChange={e => {
+                      setEditCategory(e.target.value);
+                      setEditSubcategory('');
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    style={{ 
+                      borderColor: 'var(--max-border)',
+                      background: 'var(--max-background)',
+                      color: 'var(--max-text-primary)'
+                    }}
+                  >
+                    <option value="">Выберите категорию</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subcategory */}
+                {editCategory && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--max-text-primary)' }}>
+                      Подкатегория
+                    </label>
+                    <select
+                      value={editSubcategory}
+                      onChange={e => setEditSubcategory(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                      style={{ 
+                        borderColor: 'var(--max-border)',
+                        background: 'var(--max-background)',
+                        color: 'var(--max-text-primary)'
+                      }}
+                    >
+                      <option value="">Выберите подкатегорию</option>
+                      {getCategoryById(editCategory)?.subcategories.map(sub => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--max-text-primary)' }}>
+                    Описание
+                  </label>
+                  <textarea
+                    value={editDescription}
+                    onChange={e => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-lg text-sm resize-none"
+                    style={{ 
+                      borderColor: 'var(--max-border)',
+                      background: 'var(--max-background)',
+                      color: 'var(--max-text-primary)'
+                    }}
+                    placeholder="Опишите проблему подробнее..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 max-btn max-btn-secondary"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="flex-1 max-btn max-btn-primary"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
