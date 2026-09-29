@@ -3,7 +3,7 @@ import { Send, Camera, Loader2, CheckCircle, X, Edit } from 'lucide-react';
 import { AppStore } from '../store/useStore';
 import { analyzeText, analyzeImage, analyzeTextReal, analyzeImageReal, checkMLHealth, fuseResults, FusionResult } from '../data/aiEngine';
 import { categories, getCategoryById, getSubcategoryById, getWorkerTypeName, getSeverityLabel } from '../data/categories';
-import { Incident, InputMode } from '../types';
+import type { Incident, InputMode } from '../types';
 import { mockBuildings } from '../data/mockData';
 
 interface Props {
@@ -331,16 +331,18 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
     });
   };
 
-  const handleClarificationAnswer = (answer: string) => {
+  const handleClarificationAnswer = async (answer: string) => {
     const fusion = store.pendingFusion;
     if (!fusion) return;
     
     store.addMessage({ role: 'user', content: answer });
     
     const nextStep = store.clarificationStep + 1;
+    const currentQuestion = fusion.recommendedQuestions[store.clarificationStep];
+    
     setIncidentDraft(prev => ({
       ...prev,
-      answers: { ...prev.answers, [fusion.recommendedQuestions[store.clarificationStep]?.field || '']: answer }
+      answers: { ...prev.answers, [currentQuestion?.field || '']: answer }
     }));
     
     if (nextStep < fusion.recommendedQuestions.length) {
@@ -349,8 +351,46 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
         store.addMessage({ role: 'ai', content: fusion.recommendedQuestions[nextStep].text });
       }, 500);
     } else {
+      // Все вопросы заданы - обновляем clarificationStep
+      store.setClarificationStep(nextStep);
+      
+      // Если был вопрос о описании, анализируем текст для определения подкатегории
+      if (currentQuestion?.field === 'description' || currentQuestion?.field === 'clarification') {
+        try {
+          const textResult = await analyzeText(answer);
+          if (textResult.category && textResult.subcategory) {
+            // Обновляем fusion с новой подкатегорией
+            const updatedFusion: FusionResult = {
+              ...fusion,
+              category: textResult.category || fusion.category,
+              subcategory: textResult.subcategory || fusion.subcategory,
+              classificationResult: 'KNOWN_INCIDENT'
+            };
+            
+            // Обновляем тип исполнителя если категория изменилась
+            if (textResult.category) {
+              const category = categories.find(c => c.id === textResult.category);
+              if (category) {
+                updatedFusion.recommendedWorkerType = category.defaultWorker;
+              }
+            }
+            
+            store.setPendingFusion(updatedFusion);
+            setIncidentDraft(prev => ({ ...prev, text: answer, fusion: updatedFusion }));
+            
+            setTimeout(() => {
+              showConfirmationCard(updatedFusion, answer, incidentDraft.imageType || '');
+            }, 500);
+            return;
+          }
+        } catch (error) {
+          console.error('Error analyzing clarification text:', error);
+        }
+      }
+      
+      // Если не удалось определить подкатегорию, показываем карточку с текущей информацией
       setTimeout(() => {
-        showConfirmationCard(fusion, incidentDraft.text || '', incidentDraft.imageType || '');
+        showConfirmationCard(fusion, incidentDraft.text || answer, incidentDraft.imageType || '');
       }, 500);
     }
   };
@@ -368,8 +408,8 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
     !store.pendingFusion.recommendedQuestions[store.clarificationStep].options;
 
   const showConfirmButtons = store.pendingFusion && 
-    store.pendingFusion.classificationResult === 'KNOWN_INCIDENT' && 
-    store.pendingFusion.recommendedQuestions.length <= store.clarificationStep && 
+    store.pendingFusion.classificationResult !== 'NOT_INCIDENT' && 
+    store.clarificationStep >= store.pendingFusion.recommendedQuestions.length &&
     !store.currentIncident;
 
   const hasAttachment = selectedFile || (showDemoMode && selectedImageType);
