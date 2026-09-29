@@ -1,37 +1,97 @@
-# Dependencies
-node_modules/
+# ===========================================
+# .gitignore для проекта "Аварийный диспетчер МКД"
+# ===========================================
 
-# Environment variables (секреты)
+# Зависимости
+node_modules/
+*/node_modules/
+
+# Переменные окружения (секреты)
 .env
 .env.local
 .env.*.local
+bot/.env
+docker-deploy/.env
 
-# Database
-*.sqlite
-*.db
+# Next.js
+.next/
+out/
 
-# Build output
+# Сборка и билд
 dist/
 build/
+*/dist/
+*/build/
 
-# Logs
+# Логи
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
 
-# OS files
+# Базы данных
+*.sqlite
+*.db
+*.db-journal
+database.sqlite
+bot/database.sqlite
+
+# Временные файлы и кэш
+.cache/
+.parcel-cache/
+.tsbuildinfo
+.eslintcache
+
+# Загрузки пользователей
+uploads/
+tmp/
+
+# Файлы операционной системы
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# IDE
+# IDE и редакторы
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
-# Archives
+# Архивы (не коммитим)
 *.zip
 *.tar.gz
+*.rar
+*.7z
 
-# Uploads
-uploads/
-.next/
+# Docker (не коммитим образы)
+docker-compose.override.yml
+
+# Тесты и покрытие
+coverage/
+.nyc_output/
+*.lcov
+
+# Прочее
+*.pid
+*.seed
+*.pid.lock
+lib-cov/
+.grunt/
+.lock-wscript
+node_modules/
+jspm_packages/
+bower_components/
+.pnp
+.pnp.js
