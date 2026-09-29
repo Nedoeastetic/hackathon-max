@@ -75,7 +75,7 @@ const CATEGORY_KEYWORDS: Record<string, { words: string[]; subcategory: string }
     { words: ['давлен', 'слабый напор'], subcategory: 'LOW_PRESSURE' }
   ],
   ELECTRICITY: [
-    { words: ['нет света', 'не горит', 'лампочк', 'освещен', 'темно', 'электричеств'], subcategory: 'NO_LIGHT_STAIRWELL' },
+    { words: ['нет света', 'не горит', 'не работа.*свет', 'свет.*не работа', 'свет не работа', 'лампочк', 'освещен', 'темно', 'электричеств'], subcategory: 'NO_LIGHT_STAIRWELL' },
     { words: ['провод', 'оголён', 'обнаж', 'искр'], subcategory: 'EXPOSED_WIRES' },
     { words: ['щиток', 'автомат', 'пробк'], subcategory: 'ELECTRICAL_PANEL' },
     { words: ['газ', 'пахнет газ'], subcategory: 'EXPOSED_WIRES' } // Газ — критическая ситуация
