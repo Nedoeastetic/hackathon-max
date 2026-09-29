@@ -21,6 +21,7 @@ export function ResidentChat({ store }: Props) {
   const [editSubcategory, setEditSubcategory] = useState<string>('');
   const [editDescription, setEditDescription] = useState<string>('');
   const [mlApiAvailable, setMlApiAvailable] = useState<boolean | null>(null);
+  const [apiMode, setApiMode] = useState<'auto' | 'api-only' | 'simulation'>('auto');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [incidentDraft, setIncidentDraft] = useState<{
@@ -37,11 +38,30 @@ export function ResidentChat({ store }: Props) {
 
   // Проверка доступности ML API при загрузке
   useEffect(() => {
-    checkMLHealth().then(available => {
+    const checkApi = async () => {
+      const available = await checkMLHealth();
       setMlApiAvailable(available);
-      console.log(available ? '✅ ML API доступен' : '⚠️ ML API недоступен, используется локальная симуляция');
-    });
+      console.log(available ? '✅ ML API доступен' : '⚠️ ML API недоступен');
+    };
+    checkApi();
+    
+    // Периодическая проверка каждые 30 секунд
+    const interval = setInterval(checkApi, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  // Ручная проверка ML API
+  const handleCheckApi = async () => {
+    console.log('🔍 Проверяем ML API...');
+    const available = await checkMLHealth();
+    setMlApiAvailable(available);
+    
+    if (available) {
+      alert('✅ ML API доступен и работает!');
+    } else {
+      alert('❌ ML API недоступен. Убедитесь, что прокси-сервер запущен:\n\nnode proxy-server.cjs');
+    }
+  };
 
   // Закрытие меню при клике вне его
   useEffect(() => {
@@ -195,23 +215,55 @@ export function ResidentChat({ store }: Props) {
         let textResult = null;
         let visionResult = null;
         
-        // Если ML API доступен - используем реальный анализ
-        if (mlApiAvailable) {
+        // Определяем, использовать ли ML API
+        const useApi = apiMode === 'api-only' || (apiMode === 'auto' && mlApiAvailable);
+        
+        if (apiMode === 'api-only' && !mlApiAvailable) {
+          store.setMessages(prev => prev.filter(m => m.content !== '⏳ Анализирую...'));
+          store.addMessage({
+            role: 'ai',
+            content: '❌ ML API недоступен!\n\nЗапустите прокси-сервер:\n```\nnode proxy-server.cjs\n```\n\nИли переключитесь в режим "Авто" или "Симуляция".'
+          });
+          store.setIsProcessing(false);
+          return;
+        }
+        
+        if (useApi) {
           console.log('✅ Используем ML API через прокси');
           
           if (text) {
-            textResult = await analyzeTextReal(text);
+            try {
+              textResult = await analyzeTextReal(text);
+              console.log('📝 Text API результат:', textResult);
+            } catch (error) {
+              console.error('❌ Ошибка Text API:', error);
+              if (apiMode === 'api-only') {
+                throw error;
+              }
+              // Fallback на локальную симуляцию
+              textResult = await analyzeText(text);
+            }
           }
           
           if (hasFile && selectedFile) {
-            visionResult = await analyzeImageReal(selectedFile);
+            try {
+              visionResult = await analyzeImageReal(selectedFile);
+              console.log('📷 Vision API результат:', visionResult);
+            } catch (error) {
+              console.error('❌ Ошибка Vision API:', error);
+              if (apiMode === 'api-only') {
+                throw error;
+              }
+              // Fallback - нет vision результата
+              visionResult = null;
+            }
           } else if (hasDemoImage) {
             // Для демо-режима используем локальную симуляцию
             visionResult = await analyzeImage(selectedImageType);
           }
         } else {
           // Локальная симуляция AI
-          console.log('⚠️ ML API недоступен, используем локальную симуляцию');
+          console.log('⚠️ Используем локальную симуляцию');
           textResult = text ? await analyzeText(text) : null;
           
           // Если загружен реальный файл без текста — просим описать проблему
@@ -446,12 +498,63 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
           <h2 className="text-sm font-semibold truncate" style={{ color: 'var(--max-text-primary)' }}>
             Аварийный диспетчер
           </h2>
-          <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
-            бот • онлайн
-            {mlApiAvailable === true && ' • ML API ✓'}
-            {mlApiAvailable === false && ' • Симуляция'}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs truncate" style={{ color: 'var(--max-text-secondary)' }}>
+              бот • онлайн
+            </p>
+            {/* Индикатор статуса ML API */}
+            <div className="flex items-center gap-1">
+              {mlApiAvailable === null && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                  Проверка...
+                </span>
+              )}
+              {mlApiAvailable === true && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                  ML API
+                </span>
+              )}
+              {mlApiAvailable === false && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                  Симуляция
+                </span>
+              )}
+            </div>
+          </div>
         </div>
+        
+        {/* Переключатель режимов */}
+        <div className="flex items-center gap-2">
+          <select
+            value={apiMode}
+            onChange={e => setApiMode(e.target.value as 'auto' | 'api-only' | 'simulation')}
+            className="text-xs rounded-lg px-2 py-1 border"
+            style={{ 
+              background: 'var(--max-surface)', 
+              borderColor: 'var(--max-border)',
+              color: 'var(--max-text-primary)' 
+            }}
+            title="Режим работы AI"
+          >
+            <option value="auto">Авто</option>
+            <option value="api-only">Только API</option>
+            <option value="simulation">Симуляция</option>
+          </select>
+          <button
+            onClick={handleCheckApi}
+            className="text-xs px-2 py-1 rounded-lg border hover:bg-gray-50 transition-colors"
+            style={{ 
+              borderColor: 'var(--max-border)',
+              color: 'var(--max-text-secondary)' 
+            }}
+            title="Проверить ML API"
+          >
+            🔍
+          </button>
+        </div>
+        
         <select
           value={store.selectedBuilding}
           onChange={e => store.setSelectedBuilding(e.target.value)}
@@ -473,6 +576,38 @@ ${fusion.severity === 'CRITICAL' ? '🚨 Критическая ситуация
         className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
         style={{ background: 'var(--max-surface)' }}
       >
+        {/* Панель статуса ML API */}
+        <div 
+          className="mb-3 p-3 rounded-xl border"
+          style={{ 
+            background: mlApiAvailable ? 'var(--max-background)' : '#FFF9E6',
+            borderColor: mlApiAvailable ? 'var(--max-border)' : '#FFE066'
+          }}
+        >
+          <div className="flex items-start gap-2">
+            <span className="text-lg">{mlApiAvailable ? '✅' : '⚠️'}</span>
+            <div className="flex-1 text-xs">
+              <p className="font-semibold mb-1" style={{ color: 'var(--max-text-primary)' }}>
+                {mlApiAvailable ? 'ML API подключен' : 'Локальная симуляция'}
+              </p>
+              {mlApiAvailable ? (
+                <p style={{ color: 'var(--max-text-secondary)' }}>
+                  Используем реальный ML API для анализа. Прокси-сервер работает.
+                </p>
+              ) : (
+                <>
+                  <p style={{ color: 'var(--max-text-secondary)' }} className="mb-2">
+                    Прокси-сервер не запущен. Для использования реального ML API выполните:
+                  </p>
+                  <code className="block p-2 rounded bg-gray-100 text-gray-800 font-mono text-[11px]">
+                    node proxy-server.cjs
+                  </code>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        
         {store.messages.map((msg) => (
           <div 
             key={msg.id} 
